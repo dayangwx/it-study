@@ -1,0 +1,88 @@
+1:列出自己的掌门比自己的年龄小的人员
+ 先查出掌门的名称和年龄
+SELECT e.id ,e.name,e.age,e.deptId from t_emp e INNER JOIN t_dept d ON e.deptId = d.id AND e.id = d.ceo
+
+SELECT a.name,a.age,tmp.name,tmp.age
+FROM t_emp a LEFT JOIN (SELECT e.id ,e.name,e.age,d.ceo,e.deptId from t_emp e INNER JOIN t_dept d ON e.deptId = d.id AND e.id = d.ceo
+)tmp ON a.deptId = tmp.deptId
+WHERE a.age > tmp.age
+
+way2
+先求出所有人的掌门ceo
+SELECT e.name,e.age,d.ceo FROM t_emp e LEFT JOIN t_dept d on e.deptId = d.id
+
+SELECT * FROM 
+(SELECT e.name,e.age,d.ceo FROM t_emp e LEFT JOIN t_dept d on e.deptId = d.id
+) tmp
+LEFT JOIN t_emp e ON tmp.ceo = e.id
+WHERE tmp.age > e.age;
+
+
+
+SELECT
+	e. NAME,
+	e.age,
+	d.ceo,
+	a.NAME,
+	a.age
+FROM
+	t_emp e
+LEFT JOIN t_dept d ON e.deptId = d.id
+LEFT JOIN t_emp a ON a.id = d.ceo
+WHERE
+	e.age > a.age
+
+
+2：列出所有年龄低于自己门派平均年龄的人员
+ 先查出各个门派的平均年龄
+SELECT avg(age),deptId FROM t_emp GROUP BY deptId
+
+SELECT * from 
+t_emp e LEFT JOIN (SELECT avg(age) avgAge,deptId FROM t_emp GROUP BY deptId) tmp
+on e.deptId = tmp.deptId
+WHERE e.age < tmp.avgAge
+
+
+3：列出至少两个年龄大于40岁的成员的门派
+ 先查出各个门派的年龄大于40的成员人数
+SELECT * FROM
+(SELECT count(1) size,deptId from t_emp e WHERE e.age > 40 GROUP BY e.deptId ) tmp
+LEFT JOIN  t_dept d on tmp.deptId = d.id WHERE tmp.size >= 2
+
+4：至少有两位非掌门人成员的门派
+	先查出各个门派的人员
+SELECT count(1) size,deptId from t_emp e GROUP BY deptId
+
+SELECT * from t_dept d LEFT JOIN (SELECT count(1) size,deptId from t_emp e GROUP BY deptId) tmp 
+ON d.id = tmp.deptId
+
+
+5：列出全部人员，并增加一列备注“是否为掌门”，如果是掌门显示是，不是掌门显示否
+SELECT *,IF(e.id = d.ceo,'是','否')是否掌门 from t_emp e LEFT JOIN t_dept d ON e.deptId = d.id 
+
+
+6：列出全部门派，并增加一列备注“老鸟or菜鸟”，如果门派的平均年龄>50显示老鸟，否则显示菜鸟
+SELECT avg(age) avgAge,deptId from t_emp GROUP BY deptId
+SELECT *,IF(tmp.avgAge > 50,'老鸟','菜鸟') "老鸟or菜鸟" from t_dept d LEFT JOIN (SELECT avg(age) avgAge,deptId from t_emp GROUP BY deptId) tmp
+on d.id = tmp.deptId
+
+7：显示每个门派年龄最大的人
+SELECT max(age),deptId from t_emp GROUP BY deptId
+
+8：显示每个门派年龄第二大的人
+查出每个门派小于最大年龄的人
+SELECT * from t_emp e LEFT JOIN (SELECT max(age) maxAge,deptId from t_emp GROUP BY deptId) tmp on
+e.deptId = tmp.deptid WHERE e.age < tmp.maxAge
+
+然后再取最大值
+SELECT MAX(tmp.age) maxAGE,tmp.deptId
+ from (SELECT e.id,e.name,e.age,e.deptId from t_emp e LEFT JOIN (SELECT max(age) maxAge,deptId from t_emp GROUP BY deptId) tmp on
+e.deptId = tmp.deptid WHERE e.age < tmp.maxAge
+)tmp GROUP BY tmp.deptId
+
+SELECT a.* from (SELECT e.id,e.name,e.age,e.deptId from t_emp e LEFT JOIN (SELECT max(age) maxAge,deptId from t_emp GROUP BY deptId) tmp on
+e.deptId = tmp.deptid WHERE e.age < tmp.maxAge)a LEFT JOIN (SELECT MAX(tmp.age) maxAGE,tmp.deptId
+ from (SELECT e.id,e.name,e.age,e.deptId from t_emp e LEFT JOIN (SELECT max(age) maxAge,deptId from t_emp GROUP BY deptId) tmp on
+e.deptId = tmp.deptid WHERE e.age < tmp.maxAge
+)tmp GROUP BY tmp.deptId) b on a.deptId = b.deptId 
+WHERE a.age = b.maxAGE
