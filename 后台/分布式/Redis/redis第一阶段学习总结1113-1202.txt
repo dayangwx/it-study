@@ -1,0 +1,62 @@
+1：redis是什么
+2：redis安装 windos/linux
+3：五大数据类型
+   string
+   list
+   set
+   hash
+   zset
+4：三种其他类型
+   地理类型
+   bitmap 
+   hyperloglog
+5：事务     
+   开启事务    
+   入列
+   执行
+   撤销
+   监听 watch 监听一个key
+6：jedis 
+7：整合springboot
+   非常简单，创建springboot工程，添加依赖即可使用
+   一般情况下都会自己配置redis的template
+8：主从复制
+   一主三从
+   更改配置文件
+     port
+     pid
+     rdb
+     log
+   拜大哥
+     slaveof ip port
+     slaveof no one
+    info replication
+ 9：持久化
+    rdb
+      设置持久化规则，默认多少秒执行一次
+      这种耗费资源较少
+
+    aop
+    	append only file
+    	把所有执行的命令都持久化
+    	这种耗费资源，默认每秒执行一次，所以数据完整性要高
+ 10：集群的三种模式
+    主从复制
+    哨兵模式
+    	目的：监控集群，选出大哥。
+        这是需要额外启动的。
+    cluster
+ 11：缓存穿透   redis和mysql都没有的key
+     缓存击穿   高频大量访问一个key
+     缓存雪崩   缓存集体失效
+
+不足：
+   对redis有基本了解，
+   但对于java中如何使用redis比较浅，
+   对于redis高阶几乎无介绍或介绍浅显
+     3主3从的cluster集群
+     布隆过滤器
+     缓存穿透
+     缓存击穿
+     缓存雪崩 
+这些在后续的学习过程中要弥补。
