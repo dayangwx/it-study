@@ -367,6 +367,44 @@ ${msg}
 </html>
 ```
 
+### 4-1.常用注解
+
+#### 4-1-1.@RequestMapping
+
+> You can use the `@RequestMapping` annotation to map requests to controllers methods. 
+>
+> 就是把请求映射到controller方法上。
+
+**There are also HTTP method specific(特定的) shortcut(快捷) variants(变体) of `@RequestMapping`:**
+
+- `@GetMapping`
+- `@PostMapping`
+
+- `@PutMapping`
+- `@DeleteMapping`
+- `@PatchMapping`
+
+#### 4-1-2.@RequestBody & @ResponseBody
+
+> @RequestBody：将请求体(一般为post请求)的数据映射到Object对象上。
+>
+> @ResponseBody：将返回数据直接返回到请求体中。不去走springmvc的Model或者视图解析器。
+>
+> 底层由HttpMessageConverter来实现。
+
+```java
+// path：访问路径; consumes:消费的数据类型，就是请求数据的类型
+// RequestBody：把请求体中的数据映射到Object对象上
+@PostMapping(path = "/add",consumes = "application/json")
+@ResponseBody
+public String add(@RequestBody @Valid Staff staff){
+    System.out.println(staff);
+    return staff.toString();
+}
+```
+
+
+
 ## 5、RestFul风格
 
 > Restful就是一个资源定位及资源操作的风格。不是标准也不是协议，只是一种风格。

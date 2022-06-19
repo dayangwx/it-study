@@ -40,7 +40,7 @@
 
 ​		<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220530220910841.png" alt="image-20220530220910841" style="zoom:67%;" />
 
- 	**分布式：**
+​	**分布式：**
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220530220939733.png" alt="image-20220530220939733" style="zoom:67%;" />
 
