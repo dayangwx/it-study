@@ -123,7 +123,7 @@ Docker 将应用程序与该程序的依赖，打包在一个文件里面。运�
 
 ### 2-0.Docker的基本组成
 
-![image-20220619094012593](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220619094012593.png)
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220619094012593.png" alt="image-20220619094012593" style="zoom:67%;" />
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220619090450373.png" alt="image-20220619090450373" style="zoom:50%;" />
 
@@ -293,3 +293,143 @@ $ sudo rm -rf /var/lib/containerd
 
 ## 5.Docker常用命令
 
+### 5-1.帮助命令
+
+```shell
+$ docker version docker版本信息
+$ docker info    docker系统信息
+$ docker 命令 --help
+```
+
+### 5-2.镜像命令
+
+#### 5-2-1.docker images
+
+```shell
+$ docker images --help
+
+# 列出所有镜像
+[root@tech1 ~]# docker images -a   
+REPOSITORY    TAG       IMAGE ID       CREATED        SIZE
+hello-world   latest    feb5d9fea6a5   9 months ago   13.3kB
+# 解释
+REPOSITORY	:仓库源
+TAG			:标签
+IMAGE ID	:镜像ID
+CREATED		:创建时间
+SIZE 		:镜像大小
+
+[root@tech1 ~]# docker images --help
+
+Usage:  docker images [OPTIONS] [REPOSITORY[:TAG]]
+
+List images
+
+Options:
+  -a, --all             Show all images (default hides intermediate images)
+  -q, --quiet           Only show image IDs
+  
+$ docker images -qa  // 列出所有镜像的image id
+```
+
+#### 5-2-2.docker search
+
+```shell
+$ docker search --help
+
+# 从docker hub中搜索与mysql镜像
+$ docker search mysql
+
+# 从docker hub中搜索star数量大于等于3000的mysql镜像
+$ docker search --filter-STARS=3000 mysql
+
+[root@tech1 ~]# docker search --filter=STARS=4000 mysql
+NAME      DESCRIPTION                                     STARS     OFFICIAL   AUTOMATED
+mysql     MySQL is a widely used, open-source relation…   12755     [OK]       
+mariadb   MariaDB Server is a high performing open sou…   4896      [OK]  
+```
+
+#### 5-2-3.docker pull
+
+```shell
+# 下载镜像
+$ docker pull --help
+
+# 从docker hub下载mysql镜像
+[root@tech1 ~]# docker pull mysql
+Using default tag: latest				# 默认下载最新版本
+latest: Pulling from library/mysql
+c1ad9731b2c7: Pull complete 			# 分层下载，  联合文件系统
+54f6eb0ee84d: Pull complete 
+cffcf8691bc5: Pull complete 
+89a783b5ac8a: Pull complete 
+6a8393c7be5f: Pull complete 
+af768d0b181e: Pull complete 
+810d6aaaf54a: Pull complete 
+2e014a8ae4c9: Pull complete 
+a821425a3341: Pull complete 
+3a10c2652132: Pull complete 
+4419638feac4: Pull complete 
+681aeed97dfe: Pull complete 
+Digest: sha256:548da4c67fd8a71908f17c308b8ddb098acf5191d3d7694e56801c6a8b2072cc # 签名，防伪作用
+Status: Downloaded newer image for mysql:latest
+docker.io/library/mysql:latest			# 真实下载地址
+
+$ docker pull mysql 
+$ docker pull docker.io/library/mysql:latest
+上面这两个命令是等价的。
+
+
+[root@tech1 ~]# docker pull --help
+Usage:  docker pull [OPTIONS] NAME[:TAG|@DIGEST]  eg：$ docker pull mysql:5.7
+Pull an image or a repository from a registry
+Options:
+  -a, --all-tags                Download all tagged images in the repository
+      --disable-content-trust   Skip image verification (default true)
+      --platform string         Set platform if server is multi-platform capable
+  -q, --quiet                   Suppress verbose output
+  
+ # 指定版本下载镜像 当然，指定的版本必须存在，可以去docker hub的网站进行查询
+ $ docker pull mysql:5.7 
+```
+
+**下例为docker hub中查看支持的mysql的版本：**
+
+<img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220621223313234.png" alt="image-20220621223313234" style="zoom:57%;" />
+
+#### 5-2-4.docker rmi
+
+> 删除镜像 rmi ： i代表image
+>
+> docker rm ：删除docker container
+>
+> 
+>
+> You can remove an image using its short or long ID, its tag, or its digest. 
+
+```shell
+# 按照image id删除镜像
+$ docker rmi [IMAGE ID]
+
+# 删除latest的redis，根据名称remove
+$ docker rmi redis
+
+#指定某个镜像的tag删除
+$ docker rmi redis:6.2
+
+# 根据镜像id删除
+$ docker rmi image_id
+# 删除多个镜像，根据image id
+$ docker rmi image_id1 image_id2 image_id3
+# 把docker images -qa查出来的所有镜像都删除掉
+$ docker rmi -f $(docker images -qa)
+
+# repository+tag的方式删除
+$ docker rmi test2:latest
+```
+
+
+
+
+
+### 5-3.容器命令
