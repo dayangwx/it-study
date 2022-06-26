@@ -428,8 +428,176 @@ $ docker rmi -f $(docker images -qa)
 $ docker rmi test2:latest
 ```
 
-
-
-
-
 ### 5-3.容器命令
+
+> 容器是建立在镜像的基础上的，有镜像才能启动容器。
+
+#### 5-3-1.启动容器
+
+```bash
+$ docker run [可选参数] image
+# 参数说明
+--name="Name" 容器名字 
+-d 			  后台静默运行  类似于：nohup
+-it			  容器的 Shell 映射到当前的 Shell，然后你在本机窗口输入的命令，就会传入容器。
+-p		      指定容器的端口，-p 8080:8080  第一个是本机的端口，第二个是容器的端口
+	-p ip:主机端口:容器端口
+	-p 主机端口:容器端口 (常用)
+	-p 容器端口
+-P    		  随机指定端口
+
+
+1:下载centos 镜像
+$ docker pull centos
+2:启动docker 
+$ docker run -it centos /bin/bash
+-it参数   ：容器的 Shell 映射到当前的 Shell，然后你在本机窗口输入的命令，就会传入容器。
+/bin/bash：容器启动以后，内部第一个执行的命令。这里是启动 Bash，保证用户可以使用 Shell。
+
+#eg：
+# 启动后会进入到容器内部，可以发现你的用户已经发生了变化。
+# 退出使用exit，发现我们又回到了tech1用户，说明从容器中出来了。
+[root@tech1 ~]# docker run -it centos /bin/bash
+[root@b7e5d596f3ab /]# ls
+bin  dev  etc  home  lib  lib64  lost+found  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+[root@b7e5d596f3ab /]# exit
+[root@b7e5d596f3ab /]# exit
+exit
+[root@tech1 ~]# 
+```
+
+#### 5-3-2.查看运行的容器
+
+```shell
+$ docker ps 
+-a			all，列出所有的容器，包括正在运行的以及已经停止的 
+-q			只列出容器的id
+-n=?		个数过滤，比如说-n=2，就是列出两个
+-s			status,查看状态
+
+# 查看当前正在运行的容器
+$ docker ps 
+
+# 查看正在运行的以及曾经运行过的容器
+$ docker ps -a
+
+# 列出所有的容器的两个id
+$ docker ps -aq -n=2
+```
+
+#### 5-3-3.退出容器
+
+```shell
+# 在进入容器后，退出的时候会停止容器，执行:
+$ exit
+
+# 退出容器的时候不停止容器
+$ ctrl + P +Q
+```
+
+#### 5-3-4.停止容器
+
+> docker stop 与 docker kill 均可以将容器停掉，但二者究竟有什么区别呢？首先，摘录一下官网对这两个功能的描述：
+>
+> - **docker stop**: *Stop a running container (**send SIGTERM, and then SIGKILL after grace period**) [...] The main process inside the container will receive SIGTERM, and after a grace period, SIGKILL. [emphasis mine]*
+> - **docker kill**: *Kill a running container (**send SIGKILL, or specified signal**) [...] The main process inside the container will be sent SIGKILL, or  any signal specified with option --signal. [emphasis mine]*
+>
+> 　docker stop，支持“优雅退出”。先发送SIGTERM信号，在一段时间之后（10s）再发送SIGKILL信号。Docker内部的应用程序可以接收SIGTERM信号，然后做一些“退出前工作”，比如保存状态、处理当前请求等。
+>
+> 
+> 　docker kill，发送SIGKILL信号，应用程序直接退出。
+>
+>
+> 　线上应用优雅退出十分必要。docker stop也不是docker独有的设计，lxc和google borg系统都有类似设计，即在发送SIGKILL之前，发送SIGTERM信号通知任务。
+
+```shell
+$ docker stop 
+	 -t, --time int   Seconds to wait for stop before killing it (default 10)
+
+# 停止正在运行的所有docker，下面两个作用相同
+$ docker stop $(docker ps -aq)
+$ docker ps -aq | xargs docker stop
+
+$ docker kill containerId
+```
+
+#### 5-3-5.删除容器
+
+> 容器停止运行之后，并不会消失，用下面的命令删除容器文件
+
+```shell
+# 列出所有的容器，包括正在运行的以及已经停止的
+$ docker container ls --all
+$ docker ps -a
+
+# 删除全部容器
+$ docker rm $(docker ps -aq)
+
+
+# 注意：如果一个命名的容器启动后又停止了，再次用同样的命名启动是启动不起来的。
+# 例如：下例中centosLeoLiu2这个名字已经被使用过了。
+[root@tech1 ~]# docker run --name="centosLeoLiu2" -it centos /bin/bash
+docker: Error response from daemon: Conflict. The container name "/centosLeoLiu2" is already in use by container "9c3605bd3a32f06e3d5acc1c204a45bcd4b0b66ed964b0d2873d670bf9f44928". You have to remove (or rename) that container to be able to reuse that name.
+See 'docker run --help'
+# 可以使用一下两个命令启动或重启：
+$ docker start container_id
+$ docker restart container_id
+# 但是上述起来后无法进入容器，我们使用一下命令进入容器：
+$ docker container exec -it container_id /bin/bash
+```
+
+### 5-4.其他常用命令
+
+> 点多
+
+#### 5-4-1.后台启动容器
+
+```shell
+$ docker run -d image_name
+# 后台静默启动，用docker ps看发现没有启动，
+# 坑：docker后台静默启动一定要有个前台进程，docker发现没有应用，就自动停止了。
+```
+
+#### 5-4-2.查看日志
+
+```shell
+$ docker logs --help
+Usage:  docker logs [OPTIONS] CONTAINER
+
+Fetch the logs of a container
+
+Options:
+      --details        Show extra details provided to logs
+  -f, --follow         Follow log output
+      --since string   Show logs since timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
+  -n, --tail string    Number of lines to show from the end of the logs (default "all")
+  -t, --timestamps     Show timestamps
+      --until string   Show logs before a timestamp (e.g. 2013-01-02T13:23:37Z) or relative (e.g. 42m for 42 minutes)
+
+# 查看容器最后30行并显示时间，并且follow，实时动态监听
+$ docker logs -tf --tail 30 container_id
+```
+
+#### 5-4-3.查看容器的进程信息
+
+> 可以用于后期杀死进程
+
+```shell
+[root@tech1 ~]# docker top $(docker ps -q)
+UID                 PID                 PPID                C                   STIME               TTY 
+root                90252               90232               0                   21:33               ?
+root                91348               90232               0                   21:50               ?   
+```
+
+#### 5-4-4.查看容器元数据
+
+> 有镜像的基本信息如id，name，创建时间，状态等，也有镜像信息，挂载，配置，网络等等信息，非常全面！
+
+```shell
+$ docker inspect container_id
+```
+
+
+
+
+
