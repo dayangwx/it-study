@@ -597,7 +597,43 @@ root                91348               90232               0                   
 $ docker inspect container_id
 ```
 
+#### 5-4-5.进入正在运行的容器
 
+> 多数情况我们的容器是后台运行的，所以重新进入容器就显的很重要。
 
+##### 5-4-5-1.exec
 
+> 进入容器后开启一个新的终端
 
+```shell
+$ docker exec -it container_id /bin/bash
+```
+
+##### 5-4-5-2.attach
+
+> 进入一个正在运行的容器
+
+```shell
+$ docker attach container_id
+```
+
+#### 5-4-6.从容器内拷贝文件到主机
+
+> 把容器内部的文件拷贝出来到主机上。
+>
+> 这里不需要容器必须是正在运行的，因为就算是不运行，只要容器没有被删除文件就还是存在的。
+>
+> 如果是把主机的文件拷贝到容器上我们常用**挂载**。
+
+```bash
+# 启动一个容器并进入
+$ docker run -it centos /bin/bash
+# 在容器内的home目录下创建一个文件
+$ touch test.java
+# 此时你可以选择停止容器也可以选择不停止，本案例选择停止
+$ exit
+# 回到本机环境中，将centos容器的/home/test.java文件复制到本机的/home目录下
+$ docker cp container_id:/home/test.java /home
+```
+
+**拷贝是个手动的过程，后续采用卷的技术将自动完成文件的拷贝。**
