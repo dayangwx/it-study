@@ -279,19 +279,19 @@ $ sudo rm -rf /var/lib/docker
 $ sudo rm -rf /var/lib/containerd
 ```
 
-## 3.阿里云镜像加速
+## 3、阿里云镜像加速
 
 > 可参考：
 >
 > https://help.aliyun.com/document_detail/60750.html
 
-## 4.Docker运行流程
+## 4、Docker运行流程
 
 > 当我们执行docker run hello-world时发生了什么。
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220619210939264.png" alt="image-20220619210939264" style="zoom:50%;" />
 
-## 5.Docker常用命令
+## 5、Docker常用命令
 
 ### 5-1.帮助命令
 
@@ -637,3 +637,46 @@ $ docker cp container_id:/home/test.java /home
 ```
 
 **拷贝是个手动的过程，后续采用卷的技术将自动完成文件的拷贝。**
+
+### 5-5.小结
+
+<img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220628221456312.png" alt="image-20220628221456312" style="zoom:67%;" />
+
+```bash
+常用命令合集
+```
+
+## 6、牛刀小试
+
+### 6-1.Docker部署nginx
+
+> 使用docker部署nginx并可以通过windows访问ng。
+
+```bash
+# 1.拉取镜像
+$ docker pull nginx:tag
+# 2.启动ng
+$ docker run -d --name nginx01 -p 3344:80 nginx:tag
+# -d 	: 后台静默运行
+# --name: 起名字
+# -p 3344:80 : 3344为宿主机的端口 80为ng的端口 两者做映射，能够在通过3344访问到80
+# 3.进入ng进行查看修改等操作
+$ docker exec -it nginx02 /bin/bash
+以上三步完成(或前两步)，我们就可以通过curl localhost:3344，或者在windows里ip:80访问到ng了。
+```
+
+![image-20220628224645966](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220628224645966.png)
+
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220628224729086.png" alt="image-20220628224729086" style="zoom:67%;" />
+
+**思考：**
+
+​	如果我现在需要改动ng的配置，那么以目前的情况来看，我必须进入到容器内部才能更改。
+
+​	那么我们是否可以在容器外部提供一个映射路径，实现在宿主机修改配置使容器中的ng配置生效？
+
+​	**数据卷！！**
+
+### 6-2.Docker部署tomcat
+
+> 使用docker部署nginx并可以通过windows访问tomcat。
