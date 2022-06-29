@@ -680,3 +680,29 @@ $ docker exec -it nginx02 /bin/bash
 ### 6-2.Docker部署tomcat
 
 > 使用docker部署nginx并可以通过windows访问tomcat。
+
+```shell
+# 1.拉取镜像
+$ docker pull tomcat 
+# 2.启动容器
+$ docker run -d --name tomcat01 -p 8888:8080 tomcat
+# 3.访问
+发现404，
+进入webapps目录发现为空，
+因为docker是以最小文件去运行的，
+解决方案：
+进入webapp.dist目录，将这里的文件全部复制到webapp目录下
+$ docker exec -it tomcat01 /bin/bash
+$ cp -r webapps.dist/* webapps
+重新访问，发现可以了！
+```
+
+![image-20220629230543656](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220629230543656.png)
+
+**思考：**
+
+​	如果我现在需要改动tomcat的配置或者是部署一个web服务，那么以目前的情况来看，我必须进入到容器内部才能操作。
+
+​	那么我们是否可以在容器外部提供一个映射路径，实现在宿主机修改能够映射到容器中？
+
+​	
