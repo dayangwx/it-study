@@ -548,7 +548,9 @@ $ docker container exec -it container_id /bin/bash
 
 ### 5-4.其他常用命令
 
-> 点多
+> # 查看资源占用情况
+>
+> docker stats
 
 #### 5-4-1.后台启动容器
 
@@ -706,3 +708,156 @@ $ cp -r webapps.dist/* webapps
 ​	那么我们是否可以在容器外部提供一个映射路径，实现在宿主机修改能够映射到容器中？
 
 ​	
+
+### 6-3.Docker部署ES
+
+## 7、Docker界面可视化工具
+
+### 7-1.portainer
+
+> Docker图形化界面管理工具。
+
+```shell
+$ docker run -d -p 8088:9000 --restart=always -v /var/run/docker.sock:/var/run/docker.sock --privileged=true portainer/portainer
+```
+
+启动成功后访问：
+
+​	http://ip:8088
+
+![image-20220704224346933](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220704224346933.png)
+
+![image-20220704224147975](C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220704224147975.png)
+
+
+
+
+
+### 7-2.Rancher(CI/CD)
+
+
+
+## 8、Docker镜像详解
+
+### 8-1.Docker镜像是什么
+
+
+
+### 8-2.Docker镜像加载原理
+
+
+
+### 8-3.分层理解
+
+
+
+### 8-4.Commit镜像
+
+> 我们把别人的镜像修改成我们自己想要的样子，然后把它制作成一个镜像。
+
+```shell
+# 启动一个tomcat
+$ docker run -it -p 8080:8080 --rm tomcat /bin/bash
+
+# 把webapp.dist下的文件全部拷贝到webapp目录下
+$ docker exec -it container_id /bin/bash 
+$ cp -r webapp.dist/* webapp
+
+# docker commit
+$ docker commit -a "leoliu" -m "add webapps application" 783adfb23787 tomcat-leo01:1.0
+
+# 查看镜像
+[root@tech1 ~]$ docker images
+REPOSITORY            TAG       IMAGE ID       CREATED         SIZE
+tomcat-leo01          1.0       71dd8e339d09   6 seconds ago   487MB
+```
+
+## 9、Docker volume(数据卷)
+
+### 9-1.volume的概念
+
+> 如果我们用docker启动了一个mysql，并且在使用的过程中保存进去了数据，
+>
+> 那么，如果我们停止了mysql，就会导致数据全部丢失，相当于是删库跑路了。
+>
+> 如何解决上述问题呢？
+>
+> Volume （数据卷），
+>
+> **其实就是把宿主机的目录与容器内的目录进行挂载，**
+>
+> **做到容器内目录下发生变化就会同步到宿主机上，**
+>
+> **而宿主机目录发生变化同样可以同步到容器内目录下，即使容器时停止的，只要它没有删除就可以。**
+>
+> 可以简单把这两个目录理解为**双向绑定**
+
+```shell
+$ docker run -v /home/testcentos:/home ...
+```
+
+**优点：**
+
+​	**只需要操作宿主机就可以实现容器内的数据变化。**
+
+### 9-2.实操1：centos
+
+```shell
+# 1.启动一个容器
+$ docker run -it -v /home/testcentos:/home centos /bin/bash
+						宿主机目录    : 容器目录
+# 2.在容器内部给home目录写入文件
+$ touch test.java
+
+# 3.在宿主机目录下查看
+$ cd /home/testcentos & ls
+
+# 4.停止容器
+$ exit
+
+# 5.在宿主机目录下修改test.java文件并新增newfile.txt
+$ vim test.java
+$ touch newfile.txt
+
+# 6.重启刚才的centos容器并进入
+$ docker ps -a | grep centos
+$ docker start container_id
+$ docker attach container_id
+
+# 7.进入到容器的/home目录下查看变化。
+$ ls
+[root@1a7681a42d01 home]$ ls
+newfile.txt  test.java
+
+# 8.查看容器详细信息
+$ docker inspect container_id | grep -A 9 Mounts
+[root@tech1 testcentos]$ docker inspect 1a7681a42d01 | grep -A 10 Mounts
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/home/testcentos",  -- 宿主机地址
+                "Destination": "/home",			-- 容器地址
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+```
+
+### 9-3.实操2：mysql
+
+> docker启动mysql并能够使用客户端连接以及创建表等保存数据。
+
+```shell
+# 启动msyql容器
+-d : 后台启动
+-it:
+-v : 数据卷 宿主机:容器  可以多个-v
+-e : 环境变量
+--name: 起名
+$ docker run -it -d -p 3310:3306 -v /home/mysql/conf:/etc/mysql/conf.d -v /home/mysql/data:/var/lib/mysql  -e MYSQL_ROOT_PASSWORD=123456 --name mysql-leo mysql:5.7 /bin/bash
+```
+
+
+
+
+
