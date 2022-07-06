@@ -831,7 +831,7 @@ newfile.txt  test.java
 
 # 8.查看容器详细信息
 $ docker inspect container_id | grep -A 9 Mounts
-[root@tech1 testcentos]$ docker inspect 1a7681a42d01 | grep -A 10 Mounts
+[root@tech1 testcentos]$ docker inspect 1a7681a42d01 | grep -A 9 Mounts
         "Mounts": [
             {
                 "Type": "bind",
@@ -850,14 +850,46 @@ $ docker inspect container_id | grep -A 9 Mounts
 ```shell
 # 启动msyql容器
 -d : 后台启动
--it:
 -v : 数据卷 宿主机:容器  可以多个-v
 -e : 环境变量
 --name: 起名
-$ docker run -it -d -p 3310:3306 -v /home/mysql/conf:/etc/mysql/conf.d -v /home/mysql/data:/var/lib/mysql  -e MYSQL_ROOT_PASSWORD=123456 --name mysql-leo mysql:5.7 /bin/bash
+$ docker run -d -p 3310:3306 -v /home/mysql/conf:/etc/mysql/conf.d -v /home/mysql/data:/var/lib/mysql  -e MYSQL_ROOT_PASSWORD=123456 --name mysql-leo mysql:5.7 
+
+验证一下：
+telnet 192.168.18.127 3310
+```
+
+使用dataGrip连接并创建表和数据
+
+![image-20220706222555742](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220706222555742.png)
+
+**注：**
+
+​	**即使我们删除了容器，数据也是不会丢失的。只要重启就可以了。（按照同样的启动命令）**
+
+### 9-4.三种挂载方式
+
+#### 9-4-1.匿名挂载
+
+> 顾名思义，就是没有名字的挂载
+>
+> docker run -d -P --name nginxleo05 -v /home/testnginx:/etc/nginx nginx这个为什么是错误的？
+>
+> https://blog.csdn.net/xyajia/article/details/107161167
+
+```shell
+$ docker run -d -P -v /etc/nginx --name nginx01 nginx
 ```
 
 
+
+
+
+#### 9-4-2.具名挂载
+
+
+
+#### 9-4-3.指定路径挂载
 
 
 
