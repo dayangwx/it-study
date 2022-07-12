@@ -873,23 +873,197 @@ telnet 192.168.18.127 3310
 
 > 顾名思义，就是没有名字的挂载
 >
-> docker run -d -P --name nginxleo05 -v /home/testnginx:/etc/nginx nginx这个为什么是错误的？
->
-> https://blog.csdn.net/xyajia/article/details/107161167
+> 格式：
+> 	... -v 容器内路径
 
 ```shell
 $ docker run -d -P -v /etc/nginx --name nginx01 nginx
+
+# 查看所有的volume
+$ docker volume ls
+DRIVER    VOLUME NAME
+local     2a56911f230706bdf7c054a207c1dc40afed0830ab5047416d119aa4052423a2
+local     83111f5469b8615b829ebd06819df82ffb14a21b74ab82c54673aa34ef9fd917
+
+# 查看某个指定volume的详情
+$ docker volume inspect 83111f5469b8615b829ebd06819df82ffb14a21b74ab82c54673aa34ef9fd917
+[
+    {
+        "CreatedAt": "2022-07-12T20:17:39+08:00",
+        "Driver": "local",
+        "Labels": null,
+       -- 挂载的路径 "Mountpoint":"/var/lib/docker/volumes/2a56911f230706bdf7c054a207c1dc40afed0830ab5047416d119aa4052423a2/_data",
+        "Name": "2a56911f230706bdf7c054a207c1dc40afed0830ab5047416d119aa4052423a2",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+
+```
+
+#### 9-4-2.具名挂载
+
+> 就是有名字的挂载。
+>
+> 格式：
+> 	... -v 名字:容器内路径
+
+```shell
+$ docker run -d -P --name juming-nginx001  -v juming-ng:/etc/nginx nginx
+
+# 查看所有的volume
+$ docker volume ls
+DRIVER    VOLUME NAME
+local     2a56911f230706bdf7c054a207c1dc40afed0830ab5047416d119aa4052423a2
+local     83111f5469b8615b829ebd06819df82ffb14a21b74ab82c54673aa34ef9fd917
+local     juming-ng
+
+# 查看某个指定volume的详情
+$ docker volume inspect juming-ng
+[
+    {
+        "CreatedAt": "2022-07-12T20:31:32+08:00",
+        "Driver": "local",
+        "Labels": null,
+        -- 挂载路径，就是宿主机的路径
+        "Mountpoint": "/var/lib/docker/volumes/juming-ng/_data",
+        "Name": "juming-ng",
+        "Options": null,
+        "Scope": "local"
+    }
+]
+```
+
+#### 9-4-3.指定路径挂载
+
+> 就是指定宿主机路径的挂载。
+>
+> 格式：
+>
+> ​	... -v 宿主机路径:容器内路径
+
+```shell
+$ docker run -d -P --name nginxleo05 -v /home/testnginx:/etc/nginx nginx这个为什么是错误的？
+
+https://blog.csdn.net/xyajia/article/details/107161167
+```
+
+#### 9-4-4.拓展
+
+> ro
+>
+> rw
+
+```shell
+$ docker run -d -P --name juming-nginx001  -v juming-ng:/etc/nginx:ro nginx
+$ docker run -d -P --name juming-nginx001  -v juming-ng:/etc/nginx:rw nginx
+ro: read only    只读
+rw: read write   可读可写
+
+只要看到ro就说明挂载的路径只能通过宿主机来修改，容器内是操作不了挂载的路径的！
+
 ```
 
 
 
+### 9-5.初识DockerFile
+
+> 使用dockerfile制作镜像并挂载
+
+```shell
+# 写一个脚本
+vim DockerFile
+From centos 
+
+VOLUME ["volume01","volume02"]  ## 只写路径，说明是匿名挂载
+
+CMD echo "------end------"
+CMD /bin/bash
+
+# build，生成镜像
+$ docker build -f DockerFile -t leo/centos:01 .
+
+# 查看镜像
+$ docker images 
+
+# 启动镜像
+$ docker run -it leo/centos:01 /bash/shell
+
+# 查看挂载路径
+$ docker inspect container_id | grep -A 20 Mounts
+ "Mounts": [
+            {
+                "Type": "volume",
+                "Name": "1391672ed2226a9a63da677fec7bff575519f7fca93d940517a10e1ee8df016d",
+                "Source": "/var/lib/docker/volumes/1391672ed2226a9a63da677fec7bff575519f7fca93d940517a10e1ee8df016d/_data",
+                "Destination": "volume01",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "f026e2286bbaf8c310f97efacee4cb6fdf3035a7d95eea2c653a7be9f337045d",
+                "Source": "/var/lib/docker/volumes/f026e2286bbaf8c310f97efacee4cb6fdf3035a7d95eea2c653a7be9f337045d/_data",
+                "Destination": "volume02",
+                "Driver": "local",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+         ]
+```
+
+问题：
+
+​	**多个容器之间如何数据共享？比如说：两个mysql之间如何互相对方的数据。**
+
+### 9-6.数据容器卷
+
+> 实现两个或多个容器之间数据共享。
+>
+> --volumes-from 
+
+```shell
+# 启动一个容器，当作father
+$ docker run -it --name docker01 leo/centos:01 
+
+# 启动另外一个容器，挂载到father上
+$ docker run -it --volumes-from docker01 --name docker02 leo/centos:01
+# 在这个容器中的volume1中新建个文件
+touch docker02.txt
+# 然后查看docker01中的volume01目录下是否有这个新建的文件，肯定是有的。
+
+#再启动第三个容器
+$ docker run -it --volumes-from docker01 --name docker03 leo/centos:01 
+# 在这个容器中的volume1中新建个文件
+touch docker03.txt
+# 然后查看docker01和docker02中的volume01目录下是否有这个新建的文件，肯定是有的。
+
+```
+
+总结：
+
+​	常用于容器之间配置信息的传递，数据卷容器的生命周期一直到没有容器使用为止。
+
+​	不过如果持久化到本地了，那本地的数据是不会删除的。
+
+​	所以你可以让father的持久化到本地。
 
 
-#### 9-4-2.具名挂载
+
+两个mysql之间数据共享:
+
+```shell
+$ docker run -d -p 3310:3306 -v /etc/mysql/conf.d -v /var/lib/mysql  -e MYSQL_ROOT_PASSWORD=123456 --name mysql-leo mysql:5.7 
+
+$ docker run -d -p 3310:3306 --volumes-from mysql-leo  -e MYSQL_ROOT_PASSWORD=123456 --name mysql-leo02 mysql:5.7 
+
+```
 
 
 
-#### 9-4-3.指定路径挂载
+## 10、DockerFile
 
-
-
+> dockerfile
