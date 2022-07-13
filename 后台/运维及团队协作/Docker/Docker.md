@@ -966,9 +966,9 @@ rw: read write   可读可写
 
 
 
-### 9-5.初识DockerFile
+### 9-5.初识Dockerfile
 
-> 使用dockerfile制作镜像并挂载
+> 使用Dockerfile制作镜像并挂载
 
 ```shell
 # 写一个脚本
@@ -1064,6 +1064,100 @@ $ docker run -d -p 3310:3306 --volumes-from mysql-leo  -e MYSQL_ROOT_PASSWORD=12
 
 
 
-## 10、DockerFile
+## 10、Dockerfile
 
-> dockerfile
+> dockerfile的作用就是用来构建镜像的一个文本文件！
+>
+> 也就是说他是用来制作镜像的！
+
+### 10-1.Dokcerfile基本介绍
+
+> Dockerfile是面向开发的，我们以后要发布项目、制作镜像，就需要编写Dockerfile文件。
+>
+> Docker镜像逐渐成为企业交付标准，必须掌握。把你写的springboot工程制作成一个镜像，而不是一个jar或者war了。如何制作？
+>
+> Dockerfile：构建文件，定义了一切的步骤，源代码。
+>
+> DockeImage：通过Dockerfile生成的镜像，是最终发布和运行的产品！
+>
+> Docker Container：容器就是镜像启动后提供服务的！
+
+### 10-2.Dockerfile构建过程
+
+- 编写Dockerfile文件
+- docker build 生成镜像
+- docker images 查看镜像
+- docker run    启动镜像
+
+### 10-3.Dockerfile常用命令
+
+> 指令全用大写！
+
+```shell
+FROM			#基础镜像，一切从这里开始
+MAINTAINER		#镜像是谁写的，姓名+邮箱
+RUN				#镜像构建的时候需要运行的命令
+ADD				#步骤：加tomcat镜像，就添加tomcat的压缩包
+WORKDIR			#镜像的工作目录
+VOLUME			#挂载的目录
+EXPOSE			#暴露端口
+CMD 			#指定这个容器启动的时候要运行的命令，只有最后一个会生效，可被替代
+ENTRYPOINT		#指定这个容器启动的时候要运行的命令，可以追加命令
+ONBUILD			#当构建一个被继承Dockerfile，这个时候会运行ONBUILD的指令
+COPY			#类似ADD，将我们的文件拷贝到镜像中
+ENV				#构建的时候设置环境变量
+```
+
+
+
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220713204610577.png" alt="image-20220713204610577" style="zoom:47%;" />
+
+### 10-4.牛刀小试
+
+#### 10-4-1.制作自己的centos镜像
+
+> 目标：
+>
+> ​	自己制作一个centos镜像，增加vim和ll以及ifconfig功能
+
+```shell
+# 1.编写Dockerfile脚本
+root@tech1 Dockerfile]# cat Dockerfile-centos 
+FROM centos
+MAINTAINER Leo Liu<971465407@qq.com>
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+# 用于解决yum install没有urls问题
+RUN cd /etc/yum.repos.d/
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+
+# 安装vim -y：安装过程中所有的yes/no问题都选yes
+RUN yum install -y vim
+RUN yum install -y net-tools
+
+EXPOSE 80
+
+
+CMD echo $MYPATH
+CMD echo "-----end----”
+CMD /bin/bash
+
+# 2.build Dockerfile文件
+$ docker build -f Dockerfile-centos -t centos-plus-leo .
+打印截取：
+Successfully built a89dd8cd0db2
+Successfully tagged centos-plus-leo:latest
+
+# 3.查看镜像
+$ docker images
+REPOSITORY            TAG       IMAGE ID       CREATED         SIZE
+centos-plus-leo       latest    a89dd8cd0db2   4 minutes ago   326MB
+
+# 4.启动镜像
+$ docker run -it centos-plus-leo
+
+启动之后，查看vim命令与ifconfig命令是否可以执行。
+```
+
