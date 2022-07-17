@@ -1161,3 +1161,158 @@ $ docker run -it centos-plus-leo
 启动之后，查看vim命令与ifconfig命令是否可以执行。
 ```
 
+#### 10-4-2.CMD与ENTRYPOINT的区别
+
+> CMD 			#指定这个容器启动的时候要运行的命令，只有最后一个会生效，可被替代
+> ENTRYPOINT	  #指定这个容器启动的时候要运行的命令，可以追加命令
+>
+> 
+>
+> **CMD不可以追加，但是ENTRYPOINT可以追加命令**！
+
+```shell
+# CMD 不可以在后面追加命令
+$ vim Dockerfile-CMD
+  FROM centos
+  CMD ["ls","-a"]
+$ docker build -f Dockerfile-CMD -t centos-CMD .
+
+$ docker run centos-CMD 
+
+$ docker run centos-CMD -l
+docker: Error response from daemon: failed to create shim task: OCI runtime create failed: runc create failed: unable to start container process: exec: "-a": executable file not found in $PATH: unknown.
+
+在后面追加-l会直接报错！
+```
+
+```shell
+# ENTRYPOINT 可以在后面追加命令
+$ vim Dockerfile-ENTRYPOINT
+	FROM centos
+	ENTRYPOINT ["ls","-a"]
+$ docker build -f Dockerfile-ENTRYPOINT -t centos-ENTRYPOINT .
+
+$ docker run centos-ENTRYPOINT
+.
+..
+.dockerenv
+bin
+dev
+etc
+home
+...
+
+$ docker run centos-ENTRYPOINT -l
+total 0
+drwxr-xr-x.   1 root root   6 Jul 14 12:51 .
+drwxr-xr-x.   1 root root   6 Jul 14 12:51 ..
+-rwxr-xr-x.   1 root root   0 Jul 14 12:51 .dockerenv
+lrwxrwxrwx.   1 root root   7 Nov  3  2020 bin -> usr/bin
+drwxr-xr-x.   5 root root 340 Jul 14 12:51 dev
+...
+
+不仅没有报错，-l生效了。
+
+```
+
+#### 10-4-3.制作自己的tomcat镜像
+
+> 需求：
+>
+> ​	1：制作tomcat镜像，包含jdk、tomcat
+>
+> ​	2：启动tomcat
+>
+> ​	3：挂载webapps路径，做到宿主机加入项目，tomcat可以运行它。
+>
+> ​	4：挂载日志catalina.out，保证我们可以通过宿主机看到日志
+
+```shell
+# 进入到/home/liuwx目录下编写Dockerfile文件
+$ vim Dockerfile
+FROM centos
+MAINTAINER leo<971465407@qq.com>
+
+COPY readme.txt /usr/local/readme.txt
+
+ADD jdk-8u311-linux-x64.tar.gz /usr/local/
+ADD apache-tomcat-9.0.64.tar.gz /usr/local/
+
+RUN cd /etc/yum.repos.d/
+RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+RUN yum -y install vim
+
+ENV MYPATH /usr/local
+WORKDIR $MYPATH
+
+ENV JAVA_HOME /usr/local/jdk1.8.0_311  # 这里的版本取决于你下载的jdk的版本。请认真检查！
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+ENV CATALINA_HOME /usr/local/apache-tomcat-9.0.64
+ENV CATALINA_BASH /usr/local/apache-tomcat-9.0.64
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib:$CATALINA_HOME/bin
+
+EXPOSE 8080
+CMD /usr/local/apache-tomcat-9.0.64/bin/startup.sh && tail -F /usr/local/apache-tomcat-9.0.64/bin/logs/catalina.out
+
+# 2.制作镜像
+$ docker build -t tomcat-leo .
+
+# 3.查看镜像
+$ docker images
+
+# 4.启动
+$ docker run -d -p 9090:8080 --name tomcat-leo01 -v /home/leo/build/tomcat/test:/usr/local/apache-tomcat-9.0.64/webapps/test -v /home/leo/build/tomcat/logs:/usr/local/apache-tomcat-9.0.64/logs images_id
+
+# 5.检查挂载的目录以及在test目录下创建WEB-INF文件夹和web.xml文件以及index.jsp文件
+$ cd /home/leo/build/tomcat/test
+$ vim index.jsp
+$ mkdir WEB-INF
+$ cd WEB-INF
+$ vim web.xml
+
+# 6.访问
+http://ip:9090/test
+
+```
+
+index.jsp
+
+```jsp
+<%@ page contentType="text/html;charset=UTF-8" language="java" pageEncoding="UTF-8" %>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Hello, Leo </title>
+</head>
+<body>
+Hello World!
+<%
+        System.out.println("-----my test log-----");
+%>
+</body>
+</html>
+```
+
+web.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" 
+xmlns="http://java.sun.com/xml/ns/javaee"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+xsi:schemaLocation="http://java.sun.com/xml/ns/javaee 
+http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+
+<welcome-file-list>
+    <welcome-file>index.jsp</welcome-file>
+    <welcome-file>index.html</welcome-file>
+</welcome-file-list>
+
+</web-app>
+```
+
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717120345164.png" alt="image-20220717120345164" style="zoom:77%;" />
+
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717120424520.png" alt="image-20220717120424520" style="zoom:67%;" />
