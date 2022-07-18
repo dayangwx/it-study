@@ -293,6 +293,10 @@ $ sudo rm -rf /var/lib/containerd
 
 ## 5、Docker常用命令
 
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717180235806.png" alt="image-20220717180235806" style="zoom:67%;" />
+
+![image-20220717183450074](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717183450074.png)
+
 ### 5-1.帮助命令
 
 ```shell
@@ -1316,3 +1320,154 @@ http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717120345164.png" alt="image-20220717120345164" style="zoom:77%;" />
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717120424520.png" alt="image-20220717120424520" style="zoom:67%;" />
+
+### 10.5.发布镜像
+
+> 将我们制作好的镜像发布到dockerhub上。
+
+```shell
+# 1.登陆dockerhub，如果没有账号去官网注册即可
+$ docker login -u dayangwx
+
+# 2.选择要发布的镜像
+$ docker images 
+
+# 2-1.如果想给镜像加tag请执行(通常情况下发布到dockerhub的镜像都会加tag)
+$ docker tag dayangwx/tomcat-diy-by-leo dayangwx/tomcat-diy-by-leo:1.0.0
+
+# 3.发布
+$ docker push dayangwx/tomcat-diy-by-leo:1.0.0
+```
+
+![image-20220717182704336](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717182704336.png)
+
+## 11、Docker网络
+
+> 如果启动了两个tomcat，那么这两个tomcat如何互相访问？
+
+```bash
+# 1.启动一个tomcat
+$ docker run -d -P --name tomcat01 tomcat
+
+# 2.查看tomcat01的网络
+$ docker exec -it tomcat01 ip addr 
+# 2.1 如果报错，可能是ip command not found原因，解决:
+# 进入容器并执行命令
+$ docker exec -it tomcat01 /bin/bash
+$ apt update
+$ apt install -y iproute2
+# 查看容器内部的网路
+$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+208: eth0@if209: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+       
+$ docker exec -it tomcat01 ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+208: eth0@if209: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+       
+# 3.启动第二个tomcat
+$ docker run -d -P --name tomcat02 tomcat 
+
+# 3.1 查看tomcat02的端口
+$ docker exec -it tomcat02 /bin/bash
+$ apt update
+$ apt install -y aproute2
+$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+210: eth0@if211: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+       
+$ docker exec tomcat02 ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+210: eth0@if211: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+       
+# 4.查看宿主机的网路
+$ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:46:ff:ff brd ff:ff:ff:ff:ff:ff
+    inet 192.168.18.127/24 brd 192.168.18.255 scope global noprefixroute ens33
+       valid_lft forever preferred_lft forever
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:a2:35:b6:71 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:a2ff:fe35:b671/64 scope link 
+       valid_lft forever preferred_lft forever
+209: veth72b84b0@if208: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether 22:93:25:f0:05:d7 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::2093:25ff:fef0:5d7/64 scope link 
+       valid_lft forever preferred_lft forever
+211: vethff9863c@if210: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether 2e:d6:94:a7:64:1a brd ff:ff:ff:ff:ff:ff link-netnsid 1
+    inet6 fe80::2cd6:94ff:fea7:641a/64 scope link 
+       valid_lft forever preferred_lft forever
+
+发现多了209和211两个。
+# 5.宿主机ping tomcat01和tomcat02
+# 5.1 tomcat01
+$ ping 172.17.0.2
+# 5.2 tomcat02
+$ ping 172.17.0.3
+都可以ping通！
+
+# 6.tomcat01 ping tomcat02
+$ docker exec tomcat01 ping 172.17.0.3
+# 如果ping命令not found
+$ apt-get update
+$ apt-get install iputils-ping
+
+[root@tech1 ~]# docker exec tomcat01 ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.072 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.063 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.077 ms
+或者你也可以进入容器内部执行：ping 172.17.0.2
+
+tomcat02亦可以ping通tomcat01
+$ docker exec -it tomcat02 apt-get update
+$ docker exec -it tomcat02 apt-get install iputils-ping
+$ docker exec tomcat02 ping 172.17.0.2
+PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
+64 bytes from 172.17.0.2: icmp_seq=1 ttl=64 time=0.067 ms
+64 bytes from 172.17.0.2: icmp_seq=2 ttl=64 time=0.085 ms
+64 bytes from 172.17.0.2: icmp_seq=3 ttl=64 time=0.066 ms
+```
+
+**总结：**
+
+​	**人通过veth-pair联通两个容器，注意：并不是tomcat01和tomcat02直连。**
+
+​	https://www.cnblogs.com/bakari/p/10613710.html
+
+
+
+<img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220718222115890.png" alt="image-20220718222115890" style="zoom:60%;" />
