@@ -1247,6 +1247,14 @@ RUN sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
 RUN sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
 RUN yum -y install vim
 
+# 解决ip命令不存在问题
+RUN apt update
+RUN apt install -y iproute2
+
+# 解决ping命令不存在问题
+RUN apt-get update
+RUN apt-get install iputils-ping
+
 ENV MYPATH /usr/local
 WORKDIR $MYPATH
 
@@ -1342,6 +1350,8 @@ $ docker push dayangwx/tomcat-diy-by-leo:1.0.0
 ![image-20220717182704336](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717182704336.png)
 
 ## 11、Docker网络
+
+### 11-0.docker0
 
 > 如果启动了两个tomcat，那么这两个tomcat如何互相访问？
 
@@ -1471,3 +1481,202 @@ PING 172.17.0.2 (172.17.0.2) 56(84) bytes of data.
 
 
 <img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220718222115890.png" alt="image-20220718222115890" style="zoom:60%;" />
+
+### 11-1.--link
+
+> docker exec tomcat02 ping 172.17.0.2
+>
+> 可以通过如上方式让tomcat02 ping通tomcat01
+>
+> 是否可以不使用ip直接ping名称呢?
+>
+> 下面的命令会执行成功吗？
+>
+> docker exec tomcat02 ping tomcat01
+
+```shell
+$ docker exec tomcat02 ping tomcat01
+ping: tomcat01: Name or service not known
+不可以直接ping通！！！
+```
+
+> 解决：使用--link
+
+```shell
+# 启动tomcat03 --link tomcat02
+$ docker run -d -P --name tomcat03 --link tomcat02 tomcat
+
+# ping not found问题
+$ docker exec tomcat03 apt-get update
+$ docker exec tomcat03 apt-get install inetutils-ping
+
+# tomcat03 ping tomcat02
+$ docker exec tomcat03 ping tomcat02
+PING tomcat02 (172.17.0.3) 56(84) bytes of data.
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=1 ttl=64 time=0.172 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=2 ttl=64 time=0.065 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=3 ttl=64 time=0.084 ms
+64 bytes from tomcat02 (172.17.0.3): icmp_seq=4 ttl=64 time=0.115 ms
+可以成功！
+```
+
+**思考：**
+
+​	**1：tomcat02启动没有--link tomcat03，那么tomcat02 可以直接ping tomcat03吗？**
+
+​    **答案是不可以。所以docker0网络有弊端，自定义网络可以解决这个问题。**
+
+### 11-2.自定义网络
+
+> 为了解决容器直接不能直接通过name ping通的问题，我们可以使用自动网络。
+>
+> 过程：
+>
+> ​	1：创建自定网络
+>
+> ​	2：容器启动时使用自定的网络
+
+认识docker网络：
+
+```shell
+[root@tech1 ~]# docker network ls
+NETWORK ID     NAME      DRIVER    SCOPE
+537739b2b204   bridge    bridge    local
+c06d6b20af88   host      host      local
+a2caed78bbfc   none      null      local
+```
+
+网络模式：
+
+​	bridge：桥接。docker默认
+
+​	none  ：不配置网络
+
+​	host  ：和宿主机共享网络
+
+​	container：容器网络联通(用的少，很局限)
+
+```shell
+# 直接启动命令，下面两种是等价的，默认就是bridge
+$ docker run -d -P --name tomcat01 tomcat
+$ docker run -d -P --name --net bridge tomcat
+```
+
+创建自定义网络：
+
+```shell
+$ docker network create --help
+
+$ docker network create --driver bridge --subnet 192.168.0.0/16 --gateway 192.168.0.1 mynet
+
+$ docker network ls
+
+$ docker network inspect network_id
+```
+
+启动tomcat
+
+```bash
+$ docker run -d -P --name tomcat01 --network mynet tomcat
+
+$ docker run -d -P --name tomcat02 --network mynet tomcat
+```
+
+通过name互联
+
+```shell
+$ docker exec tomcat01 ping tomcat02
+
+$ docker exec tomcat02 ping tomcat01
+```
+
+### 11-3.网络联通
+
+> 如果有两个网络：mynet1,mynet2，其中，tomcat01部署到mynet1网络下，tomcat02部署到mynet2网络下。
+>
+> 请问：如何让tomcat01可以ping通tomcat02？
+
+<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220723171139263.png" alt="image-20220723171139263" style="zoom:57%;" />
+
+**思路：**
+
+​	**因为是不同网络所以不可以直接ping通。**
+
+​	**利用docker network connect。**
+
+​	**本质上就是容器绑定到网络上。使用docker network inspect命令可以看到容器在网络的container里**
+
+```shell
+$ docker network connect --help
+Usage:  docker network connect [OPTIONS] NETWORK CONTAINER
+
+Connect a container to a network  ==将一个容器连接到一个网络上==
+
+Options:
+      --alias strings           Add network-scoped alias for the container
+      --driver-opt strings      driver options for the network
+      --ip string               IPv4 address (e.g., 172.30.100.104)
+      --ip6 string              IPv6 address (e.g., 2001:db8::33)
+      --link list               Add link to another container
+      --link-local-ip strings   Add a link-local address for the container
+
+# 将tomcat01连接到mynet2网络上
+$ docker network connect mynet2 tomcat01
+
+$ docker network inspect mynet2
+ 发现tomcat01被放到mynet2网络里了。
+ 
+$ docker exec tomct01 ping tocmat02
+
+但是tomcat02依旧ping不通tomcat01
+$ docker network connect mynet1 tomcat02
+
+```
+
+## 12、Docker实战
+
+### 12-1.Docker部署redis集群
+
+
+
+### 12-2.Docker部署自己的springboot工程
+
+> 步骤：
+>
+> ​	1：构建工程
+>
+> ​	2：打包应用(jar)
+>
+> ​	3：编写Dockerfile文件
+>
+> ​	4：上传jar+Dockerfile到服务器
+>
+> ​	5：构建镜像
+>
+> ​	6：启动容器
+>
+> 
+>
+> 源码地址：https://github.com/dayangwx/hello-docker/
+
+```shell
+$ Dockerfile
+FROM java:8
+COPY *.jar /app.jar
+CMD ["--server.port=8080"]
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app.jar"]
+
+# 上传jar包与Dockerfile到/home/liuwx/docker2目录下
+
+# 构建镜像
+$ docker build -t hello .
+
+# 启动容器
+$ docker run -d -p 8080:8080 hello 
+
+# 内部测试
+$ curl http://localhost:8080/hello
+hello docker! I'm springboot project
+```
+
