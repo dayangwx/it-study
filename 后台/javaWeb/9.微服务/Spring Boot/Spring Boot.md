@@ -734,5 +734,979 @@ public void addInterceptors(InterceptorRegistry registry) {
 }
 ```
 
+### 5-7.错误页面
+
+> BasicErrorController
+>
+> 直接404.html
 
 
+
+## 6、Spring Boot整合DAO
+
+### 6-1.Spring Boot整合JDBC
+
+> 整合数据库了。
+>
+> DataSourceProperties.java
+>
+> DataSourceAutoConfig.java
+
+- xml加入jdbc和mysql驱动的依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+- 配置连接信息
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/myemployees?serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+```
+
+- 编写Controller
+
+```java
+@RestController
+@RequestMapping("/user")
+public class UserController {
+
+    @Resource
+    DataSource dataSource;
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
+    @RequestMapping("/getList")
+    public List<Map<String,Object>> getUserList() throws SQLException {
+        // 原始dataSource（数据源）连接查询
+        /*Connection connection = dataSource.getConnection();
+        String sql = "select * from dept";
+        PreparedStatement preparedStatement = connection.prepareStatement(sql);
+        ResultSet resultSet = preparedStatement.executeQuery();
+        System.out.println(resultSet);
+        connection.close();*/
+
+        // 使用jdbcTemplate连接
+        String sql = "select * from dept";
+        List<Map<String, Object>> maps = jdbcTemplate.queryForList(sql);
+        return maps;
+    }
+}
+```
+
+- 访问结果
+
+<img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220811231745365.png" alt="image-20220811231745365" style="zoom: 67%;" />
+
+
+
+### 6-2.Spring Boot整合Druid数据源
+
+> 在上面的基础上只需要加一句话！！！
+>
+> type: com.alibaba.druid.pool.DruidDataSource
+
+```xml
+<!-- https://mvnrepository.com/artifact/com.alibaba/druid -->
+<!-- 使用druid进行监控 -->
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-starter</artifactId>
+    <version>1.1.10</version>
+</dependency>
+```
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/myemployees?serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+```
+
+高级设置：
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/myemployees?serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+    #配置druid
+    druid:
+      # 初始化大小，最小，最大
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      # 配置获取连接等待超时的时间
+      max-wait: 60000
+      # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位毫秒
+      time-between-eviction-runs-millis: 60000
+      # 配置一个连接在池中最小生存时间
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1 FROM sys_user
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      # 打开 PSCache，并且指定每个连接上 PSCache 的大小
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      # 配置监控统计拦截的 Filter， SQL 去掉后监控界面无法统计，wall 用于防火墙
+      filters: stat,wall,log4j
+      # 通过 connection-properties 属性打开 mergeSql 功能；慢 SQL 记录
+      connection-properties: druid.stat.mergeSql\=true;druid.stat.slowSqlMillis\=5000
+      # 配置 DruidStatFilter
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: .js,*.gif,*.jpg,*.bmp,*.png,*.css,*.ico,/druid/*
+      # 配置 DruidStatViewServlet
+      stat-view-servlet:
+        url-pattern: /druid/*
+        # IP 白名单，没有配置或者为空，则允许所有访问
+        allow: 127.0.0.1
+        # IP 黑名单，若白名单也存在，则优先使用
+        deny: 192.168.31.33
+        # 禁用 HTML 中 Reset All 按钮
+        reset-enable: false
+        # 登录用户名/密码
+        login-username: root
+        login-password: 123456
+  #配置mybatis
+mybatis-plus:
+  global-config:
+    db-config:
+      id-type: auto
+      field-strategy: not_empty
+      table-underline: true
+      db-type: mysql
+      logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+      logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
+```
+
+![image-20220815221424231](C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220815221424231.png)
+
+### 6-3.Spring Boot整合mybatis(Druid数据源)
+
+> 整合mybatis，使用druid数据源
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>2.2.2</version>
+</dependency>
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid-spring-boot-starter</artifactId>
+    <version>1.1.10</version>
+</dependency>
+<!-- 日志-->
+<dependency>
+    <groupId>log4j</groupId>
+    <artifactId>log4j</artifactId>
+    <version>1.2.17</version>
+</dependency>
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <scope>runtime</scope>
+</dependency>
+
+<build>
+    <resources>
+        <resource>
+            <directory>src/main/java</directory>
+            <includes>
+                <include>**/*.properties</include>
+                <include>**/*.xml</include>
+            </includes>
+            <filtering>true</filtering>
+        </resource>
+    </resources>
+</build>
+```
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/myemployees?serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    type: com.alibaba.druid.pool.DruidDataSource
+    #配置druid
+    druid:
+      # 初始化大小，最小，最大
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      # 配置获取连接等待超时的时间
+      max-wait: 60000
+      # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位毫秒
+      time-between-eviction-runs-millis: 60000
+      # 配置一个连接在池中最小生存时间
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1 FROM sys_user
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      # 打开 PSCache，并且指定每个连接上 PSCache 的大小
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      # 配置监控统计拦截的 Filter， SQL 去掉后监控界面无法统计，wall 用于防火墙
+      filters: stat,wall,log4j
+      # 通过 connection-properties 属性打开 mergeSql 功能；慢 SQL 记录
+      connection-properties: druid.stat.mergeSql\=true;druid.stat.slowSqlMillis\=5000
+      # 配置 DruidStatFilter
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: .js,*.gif,*.jpg,*.bmp,*.png,*.css,*.ico,/druid/*
+      # 配置 DruidStatViewServlet
+      stat-view-servlet:
+        url-pattern: /druid/*
+        # IP 白名单，没有配置或者为空，则允许所有访问
+        allow: 127.0.0.1
+        # IP 黑名单，若白名单也存在，则优先使用
+        deny: 192.168.31.33
+        # 禁用 HTML 中 Reset All 按钮
+        reset-enable: false
+        # 登录用户名/密码
+        login-username: admin
+        login-password: 123456
+#配置mybatis
+mybatis:
+  type-aliases-package: com.xiu.pojo
+```
+
+```java
+package com.xiu.mapper;
+
+import com.xiu.pojo.Staff;
+import org.apache.ibatis.annotations.Mapper;
+
+import java.util.List;
+
+@Mapper
+public interface StaffMapper {
+    /**
+     *查 读取(Retrieve)
+     * fetch data
+     * @return List<User>
+     */
+    List<Staff> queryAlluser();
+    /**
+     *查 读取(Retrieve)
+     * fetch data by userid
+     * @param  userid
+     * @return User
+     */
+    /**
+     @Select("select * from user where userid = #{userid}")
+     本人喜欢讲SQL语句写在mapper.xml文件中，这样显得代码比较整齐
+     在后期开发中，一旦SQL语句变得繁琐起来，不利于维护
+     但是这样用注解的形式也完全可行，毕竟有些人可能写配置文件可能已经快写吐了
+     */
+    Staff queryuserbyid( int staffId);
+    /**
+     * 增加(Create)
+     * add data by user
+     * @param staff
+     * @return int
+     */
+    boolean AddUser(Staff staff);
+    /**
+     * 删除(Delete)
+     * @param id
+     * @return int
+     */
+    boolean DelUser(int id);
+    /**
+     * 更新(Update)
+     * @param staff
+     * @return boolean
+     */
+    boolean UpdUser(Staff staff);
+
+    Staff queryuserbyname(String name);
+}
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace:改mapper.xml映射文件的唯一标识并且必须和数据处理层的接口的路径相同-->
+<mapper namespace="com.xiu.mapper.StaffMapper">
+    <!--   必须添加property属性 ，区别于是否加主键-->
+    <resultMap id="user" type="Staff">
+        <id column="id" property="id" javaType="int" ></id>
+        <result column="name" property="name" javaType="String" ></result>
+        <result column="password" property="password" javaType="String" ></result>
+    </resultMap>
+    <!--id的值必须和数据处理层的接口名一致-->
+    <!--此处的User-->
+    <select id="queryAlluser" resultType="com.xiu.pojo.Staff">
+        select * from  staff
+    </select>
+    <select id="queryuserbyid"   parameterType="int" resultMap="user" resultType="Staff">
+        select * from  staff
+        <trim suffixOverrides="and"  prefixOverrides="and">
+            <where>
+                <if test="id!=null">
+                    and id = #{staffId}
+                </if>
+            </where>
+        </trim>
+    </select>
+    <select id="queryuserbyname" resultType="Staff" parameterType="string" resultMap="user">
+        select * from  staff
+        <trim suffixOverrides="and"  prefixOverrides="and">
+            <where>
+                <if test="name!=null">
+                    and name = #{name}
+                </if>
+            </where>
+        </trim>
+    </select>
+    <update id="UpdUser" parameterType="Staff">
+    </update>
+    <delete id="DelUser"></delete>
+    <insert id="AddUser" parameterType="Staff" >
+        insert into  staff value (${id},#{name},${password})
+    </insert>
+</mapper>
+```
+
+![image-20220816210529021](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220816210529021.png)
+
+```java
+package com.xiu.config;
+
+import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.support.http.StatViewServlet;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import javax.sql.DataSource;
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class DataSourceConfig {
+
+    /**
+     * 当向容器中添加了 Druid 数据源
+     * 使用 @ConfigurationProperties 将配置文件中 spring.datasource 开头的配置与数据源中的属性进行绑定
+     * @return
+     */
+    @ConfigurationProperties("spring.datasource")
+    @Bean
+    public DataSource dataSource() throws SQLException {
+        DruidDataSource druidDataSource = new DruidDataSource();
+        return druidDataSource;
+    }
+}
+```
+
+<img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220816210607130.png" alt="image-20220816210607130" style="zoom:67%;" />
+
+![image-20220816210637545](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220816210637545.png)
+
+![image-20220816210651486](C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220816210651486.png)
+
+![image-20220816210702349](C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220816210702349.png)
+
+## 7、Spring Boot整合Spring Data JPA
+
+> JPA：Java Persistence API
+>
+> Spring Data API 也是一个java的持久层框架，**是 Spring 官方的天然全家桶**,可以去掉繁琐的额外配置，
+>
+> 底层以 Hibernate 为封装，对外提供了超级灵活的使用接口，又非常符合面向对象和 Rest 的风格
+>
+> 上手简单、开发效率高，又对对象的支持比较好，又有很大的灵活性，市场的认可度越来越高。
+
+### 7-1.初识Spring Data JPA
+
+```xml
+mysql驱动
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <scope>runtime</scope>
+</dependency>
+引入JPA
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+```
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/myemployees?serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+```
+
+```java
+@Data
+@Entity
+public class Staff {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    Integer id;
+
+    String name;
+
+    String password;
+}
+```
+
+```java
+public interface StaffRepository extends CrudRepository<Staff, Integer> {
+}
+```
+
+```java
+
+@RestController
+@RequestMapping(path = "/staff")
+public class StaffController {
+    @Autowired
+    private StaffRepository staffRepository;
+
+
+    @GetMapping(path = "/add")
+    public Staff addNewUser(@RequestParam String name, @RequestParam String password) {
+        Staff n = new Staff();
+        n.setName(name);
+        n.setPassword(password);
+        staffRepository.save(n);
+        return n;
+    }
+    @GetMapping(path = "/all")
+    public Iterable<Staff> getAllUsers() {
+        return staffRepository.findAll();
+    }
+
+    @PostMapping(path = "/update")
+    public Staff updateUser(@RequestBody Staff staff) {
+        return staffRepository.save(staff);
+    }
+
+    @GetMapping(path = "/info/{id}")
+    public Optional<Staff> findOne(@PathVariable Integer id) {
+        return staffRepository.findById(id);
+    }
+
+    @GetMapping(path = "/delete/{id}")
+    public void delete(@PathVariable Integer id) {
+        staffRepository.deleteById(id);
+    }
+}
+```
+
+
+
+
+
+
+
+## 8、Spring Security
+
+> 认证
+>
+> shou'quan
+
+
+
+
+
+## 9、异步任务
+
+> 异步执行，不会等待。
+>
+> @Sync
+>
+> @EnableSync
+>
+> 
+>
+> 注：@Async所修饰的函数不要定义为static类型，这样异步调用不会生效
+
+```java
+@Service
+public class AsyncService {
+
+    @Async
+    public void hello() {
+        try {
+            TimeUnit.SECONDS.sleep(3);
+            System.out.println("方法执行种。。。");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+    }
+}
+```
+
+```java
+@SpringBootApplication
+@EnableAsync
+public class Springboot12AsyncTaskApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Springboot12AsyncTaskApplication.class, args);
+    }
+}
+```
+
+**异步回调**
+
+> 我们需要使用Future来返回异步调用的结果，就像如下方式改造doTaskOne函数：
+
+```java
+@Async
+public Future<Boolean> doTaskOne() throws Exception {
+    System.out.println("开始做任务一");
+    long start = System.currentTimeMillis();
+    Thread.sleep(random.nextInt(10000));
+    long end = System.currentTimeMillis();
+    System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
+    return new AsyncResult<>(true);
+}
+tasktwo与taskThree相似。
+```
+
+```java
+@RequestMapping("/hello3")
+public String hello3() throws Exception {
+    String result = "OK";
+    Future<Boolean> task = taskHasReturn.doTaskOne();
+    Future<Boolean> task2 = taskHasReturn.doTaskTwo();
+    Future<Boolean> task3 = taskHasReturn.doTaskThree();
+
+    if (task.isDone() && task2.isDone() && task3.isDone()) {
+        System.out.println("all tasks is done");
+    }
+    return result;
+}
+```
+
+## 10、邮件任务
+
+> 发邮件，
+>
+> 1：发简单邮件，只有正文。
+>
+> 2：发送带有附件的邮件。
+>
+> 3：依赖thyme leaf模板发送邮件。
+>
+> https://www.bilibili.com/video/BV12J411M7Sj?p=40&vd_source=06f10324a2b249ad4613f8ea7b8aeb1c
+>
+> 
+
+### 通用准备：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
+
+```
+
+```yaml
+spring:
+  mail:
+    #坑爹的地方：host 通道个人邮箱和企业邮箱通道不同。163的个人邮箱：smtp.163.com ，企业邮箱：smtp.qiye.163.com
+    # 腾讯的，个人smtp.qq.com， 企业的：smtp.exmail.qq.com
+    host: smtp.163.com
+    username: xxx@163.com
+    # 口令是邮箱开通的smtp服务后得到的客户端授权码,不是你的邮箱登录密码
+    password: xxxx
+```
+
+```java
+
+@Service("mailService")
+public class MailServiceImpl implements MailService {
+
+    private static final Logger logger = LoggerFactory.getLogger(MailServiceImpl.class);
+
+
+    /**
+     * JavaMailSender是Spring Boot在MailSenderPropertiesConfiguration 类中配直好的，该类在 Mail
+     * 自动配置类 MailSenderAutoConfiguration 中导入 因此这里注入 JavaMailSender 就可以使用了
+     */
+    @Autowired
+    private JavaMailSender mailSender;
+
+
+    /**
+     * 1、发送普通文本邮件
+     *
+     * @param mailFrom     发件人邮箱
+     * @param mailFromNick 发件人昵称
+     * @param mailTo       收件人邮箱
+     * @param cc           抄送人邮箱(可为空，方法内部处理)
+     * @param subject      主题
+     * @param content      内容
+     */
+    @Override
+    public void sendSimpleMail(String mailFrom, String mailFromNick, String mailTo, String cc,
+                               String subject, String content) {
+        try {
+            // 多个收件人之间用英文逗号分隔
+            String[] mailToArr = mailTo.split(",");
+            for (String address : mailToArr) {
+                // 简单邮件信息类
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                // HTML邮件信息类
+                MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage);
+                // 昵称
+                mimeMessageHelper.setFrom(new InternetAddress(mailFromNick + " <" + mailFrom + ">"));
+                mimeMessageHelper.setTo(address);
+                if (!StringUtils.isEmpty(cc)) {
+                    mimeMessageHelper.setCc(cc);
+                }
+                mimeMessageHelper.setSubject(subject);
+                mimeMessageHelper.setText(content);
+
+                mailSender.send(mimeMessage);
+            }
+        } catch (Exception e) {
+            logger.error("发送邮件失败：", e);
+        }
+    }
+
+    /**
+     * 2、发送带附件的邮件
+     *
+     * @param mailFrom     发件人
+     * @param mailFromNick 发件人昵称
+     * @param mailTo       收件人
+     * @param cc           抄送人
+     * @param subject
+     * @param content
+     * @param files
+     */
+    @Override
+    public void sendMailWithAttachments(String mailFrom, String mailFromNick, String mailTo, String cc,
+                                        String subject, String content, List<File> files) {
+
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        try {
+            /*
+            第二个参数true表示构造一个multipart message类型的邮件，multipart message类型的邮件包含多个正文、附件以及内嵌资源，
+            邮件的表现形式更丰富
+             */
+            MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
+            mimeMessageHelper.setFrom(new InternetAddress(mailFromNick + " <" + mailFrom + ">"));
+            mimeMessageHelper.setSubject(subject);
+            mimeMessageHelper.setText(content);
+
+            // 设置多个收件人
+            String[] toAddress = mailTo.split(",");
+            mimeMessageHelper.setTo(toAddress);
+            if (!StringUtils.isEmpty(cc)) {
+                mimeMessageHelper.setCc(cc);
+            }
+            // 添加附件
+            if (null != files) {
+                for (File file : files) {
+                    // 通过addAttachment方法添加附件
+                    mimeMessageHelper.addAttachment(file.getName(), file);
+                }
+            }
+        } catch (MessagingException e) {
+            e.printStackTrace();
+        }
+        //发送邮件
+        mailSender.send(mimeMessage);
+
+    }
+
+    /**
+     * 3、正文内容带图片
+     *
+     * @param mailFrom
+     * @param mailFromNick
+     * @param mailTo
+     * @param cc           抄送人
+     * @param subject
+     * @param content
+     * @param imagePaths
+     * @param imageId
+     */
+    @Override
+    public void sendMailWithImage(String mailFrom, String mailFromNick, String mailTo, String cc, String subject,
+                                  String content, String[] imagePaths, String[] imageId) {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        try {
+            MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
+            mimeMessageHelper.setFrom(new InternetAddress(mailFromNick + " <" + mailFrom + ">"));
+            // 设置多个收件人
+            String[] toAddress = mailTo.split(",");
+            mimeMessageHelper.setTo(toAddress);
+            if (!StringUtils.isEmpty(cc)) {
+                mimeMessageHelper.setCc(cc);
+            }
+            mimeMessageHelper.setSubject(subject);
+            // 第二个参数为true表示邮件正文是html格式的，默认是false
+            mimeMessageHelper.setText(content, true);
+
+            // 添加图片
+            if (imagePaths != null && imagePaths.length != 0) {
+                for (int i = 0; i < imagePaths.length; i++) {
+                    // 通过FileSystemResource构造静态资源
+                    FileSystemResource fileSystemResource = new FileSystemResource(imagePaths[i]);
+                    // 调用addInline方法将资源加入邮件对象中
+                    mimeMessageHelper.addInline(imageId[i], fileSystemResource);
+                }
+            }
+
+            mailSender.send(mimeMessage);
+
+        } catch (MessagingException e) {
+            System.out.println(e);
+        }
+    }
+
+    /**
+     * 4、使用Themeleaf构建邮件模板。需额外加spring-boot-starter-thymeleaf依赖
+     *
+     * @param mailFrom
+     * @param mailFromNick
+     * @param mailTo
+     * @param cc
+     * @param subject
+     * @param content
+     */
+    @Override
+    public void sendHtmlMailThymeLeaf(String mailFrom, String mailFromNick, String mailTo, String cc,
+                                      String subject, String content) {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        try {
+            MimeMessageHelper mimeMessageHelper = new MimeMessageHelper(mimeMessage, true);
+            mimeMessageHelper.setFrom(new InternetAddress(mailFromNick + " <" + mailFrom + ">"));
+            // 设置多个收件人
+            String[] toAddress = mailTo.split(",");
+            mimeMessageHelper.setTo(toAddress);
+            if (!StringUtils.isEmpty(cc)) {
+                mimeMessageHelper.setCc(cc);
+            }
+            mimeMessageHelper.setSubject(subject);
+            // 第二个参数为true表示邮件正文是html格式的，默认是false
+            mimeMessageHelper.setText(content, true);
+
+            mailSender.send(mimeMessage);
+        } catch (MessagingException e) {
+            System.out.println(e);
+        }
+    }
+}
+```
+
+```java
+package com.xiu;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+
+
+@RunWith(SpringRunner.class)
+@SpringBootTest
+public class SendmailApplicationTest {
+    @Autowired
+    private MailService mailService;
+
+    // 发件人要跟yml配置文件里填写的邮箱一致
+    String mailFrom = "m13408606645@163.com";
+    // 收件人
+    String mailTo = "1181778947@qq.com,971465407@qq.com";
+    // 抄送
+    String cc = "971465407@qq.com";
+
+
+    /**
+     * 1、测试普通邮件发送
+     */
+    @Test
+    public void testSendSimpleMail() {
+
+        String result = "发送邮件成功";
+        try {
+            mailService.sendSimpleMail(mailFrom, "一个大帅哥", mailTo, cc, "TestMail", "Hello World !");
+        } catch (Exception e) {
+            result = "发送邮件失败！";
+            System.out.println(result);
+            System.out.println(e);
+        }
+        System.out.println(result);
+    }
+
+    /**
+     * 2、测试带附件的方法
+     */
+    @Test
+    public void testSendAttachment() {
+        File imgFile = new File("src\\main\\resources\\img\\tong.jpg");
+        File txtFile = new File("src\\main\\resources\\hello.txt");
+        List<File> fileList = new ArrayList<>();
+        fileList.add(imgFile);
+        fileList.add(txtFile);
+
+        // 发件人要跟yml配置文件里填写的邮箱一致
+        String mailFrom = "m13408606645@163.com";
+        String mailTo = "1181778947@qq.com";
+
+        String result = "发送邮件成功";
+        try {
+            mailService.sendMailWithAttachments(mailFrom, "一个大帅哥", mailTo, cc, "TestMail", "what do you want to say ?", fileList);
+        } catch (Exception e) {
+            result = "发送邮件失败！";
+            System.err.println(result);
+            System.err.println(e);
+        }
+        System.out.println(result);
+    }
+
+
+    /**
+     * 3、正文带图片
+     */
+    @Test
+    public void testSendMailWithImage() {
+        // 图片路径
+        String image01Path = "src\\main\\resources\\img\\tong.jpg";
+        String image02Path = "src\\main\\resources\\img\\work.jpg";
+        String[] imageArr = new String[]{image01Path, image02Path};
+        String[] imageIdArr = new String[]{"image01", "image02"};
+
+        String result = "发送邮件成功";
+        try {
+            String contentHtml = "这是图片1:<div><img src='cid:image01'/></div>" +
+                    "这是图片2:<div><img src='cid:image02'/></div>";
+            mailService.sendMailWithImage(mailFrom, "一个大帅哥", mailTo, cc, "TestMail", contentHtml, imageArr, imageIdArr);
+        } catch (Exception e) {
+            result = "发送邮件失败！";
+            System.err.println(result);
+            System.err.println(e);
+            e.printStackTrace();
+        }
+        System.out.println(result);
+    }
+}
+```
+
+
+
+### 特别说明：
+
+> 使用Thymeleaf模板发送邮件。因为在代码种维护html太麻烦并且容易出错，所以使用Thymeleaf。
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-thymeleaf</artifactId>
+</dependency>
+```
+
+在resource下创建templates文件夹，然后在里面创建mailTemplate01.html
+
+```html
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h2>
+    通过ThymeLeaf发送html邮件
+</h2>
+<table border="1">
+    <tr>
+        <td>用户名</td>
+        <!--使用th,html标签内要导入xmlns:th="http://www.thymeleaf.org"-->
+        <td th:text="${username}"></td>
+    </tr>
+    <tr>
+        <td>年龄</td>
+        <td th:text="${age}"></td>
+    </tr>
+</table>
+
+<div>
+    这是一张图片:
+</div>
+<div>
+	<img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220531214741024.png"/>
+</div>
+</body>
+</html>
+
+```
+
+```java
+/**
+     * 4、使用ThymeLeaf
+     */
+// 注入TemplateEngine
+@Autowired
+TemplateEngine templateEngine;
+
+@Test
+public void testSendHtmlMailThymeLeaf() {
+
+    // 注意导入的包是org.thymeleaf.context
+    Context context = new Context();
+    context.setVariable("username", "zrt");
+    context.setVariable("age", "18");
+    String content = templateEngine.process("mailTemplate01.html", context);
+
+    mailService.sendHtmlMailThymeLeaf(mailFrom, "一个大帅哥", mailTo, cc, "TestMail", content);
+
+    System.out.println("邮件发送成功");
+}
+```
+
+## 11、定时任务
