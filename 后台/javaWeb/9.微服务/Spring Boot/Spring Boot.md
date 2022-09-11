@@ -1710,3 +1710,131 @@ public void testSendHtmlMailThymeLeaf() {
 ```
 
 ## 11、定时任务
+
+> https://blog.csdn.net/qianlixiaomage/article/details/106599951
+>
+> 每隔一段时间执行计划的任务。
+
+### 入门
+
+```java
+@SpringBootApplication
+@EnableScheduling
+public class Springboot15ScheduleApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(Springboot15ScheduleApplication.class, args);
+    }
+
+
+    @Scheduled(cron = "*/5 08 18 * * * 2023")
+    public void sayHello() {
+        System.out.println("hello");
+    }
+}
+```
+
+### cron表达式
+
+#### **结构**
+
+> cron表达式是一个字符串，分为6或7个域，每两个域之间用空格分隔，
+>
+> 其语法格式为："秒域 分域 时域 日域 月域 周域 年域"
+>
+> 年域似乎并不能用，会报错。
+
+#### **取值范围**
+
+| 域名 | 可取值              | 可取符号（仅列部分常用） |
+| ---- | ------------------- | ------------------------ |
+| 秒域 | 0~59的整数          | * - , /                  |
+| 分域 | 0~59的整数          | * - , /                  |
+| 时域 | 0~23的整数          | * - , /                  |
+| 日域 | 1~31的整数          | * - , / ? L              |
+| 月域 | 1~12的整数或JAN~DEC | * - , /                  |
+| 周域 | 1~7的整数或SUN~SAT  | * - , / ? L #            |
+| 年域 | 1970~2099的整数     | * - , /                  |
+
+### 基于接口的方式
+
+> 问题：
+>
+> ​	如果我们改变了cron，就需要重启服务才能生效。
+>
+> ​	那如何才能实时生效呢？
+>
+> ​	**可以使用接口来完成定时任务，统一将定时器信息存放在数据库中。**
+
+```sql
+drop table if exists `scheduled`;
+create table `scheduled` (
+ `cron_id` varchar(30) NOT NULL primary key,
+ `cron_name` varchar(30) NULL,
+ `cron` varchar(30) NOT NULL
+);
+insert into `scheduled` values ('1','定时器任务一','0/6 * * * * ?');
+```
+
+```properties
+## mysql数据源配置
+spring.datasource.url=jdbc:mysql://host:3306/dbname?useUnicode=true&serverTimezone=Asia/Shanghai
+spring.datasource.username=root
+spring.datasource.password=123456
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+```java
+package com.zhenma.mapper;
+ 
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+import org.springframework.stereotype.Repository;
+ 
+@Repository
+@Mapper
+public interface CronMapper {
+    @Select("select cron from scheduled where cron_id = #{id}")
+    public String getCron(int id);
+}
+```
+
+```java
+package com.zhenma.scheduled;
+ 
+import com.zhenma.mapper.CronMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.SchedulingConfigurer;
+import org.springframework.scheduling.config.ScheduledTaskRegistrar;
+import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.stereotype.Component;
+ 
+@Component
+@EnableScheduling
+public class MyTask implements SchedulingConfigurer {
+ 
+    @Autowired
+    protected CronMapper cronMapper;
+ 
+    @Override
+    public void configureTasks(ScheduledTaskRegistrar scheduledTaskRegistrar) {
+        scheduledTaskRegistrar.addTriggerTask(() -> process(),
+                triggerContext -> {
+                    String cron = cronMapper.getCron(1);
+                    if (cron.isEmpty()) {
+                        System.out.println("cron is null");
+                    }
+                    return new CronTrigger(cron).nextExecutionTime(triggerContext);
+                });
+    }
+ 
+    private void process() {
+        System.out.println("基于接口定时任务");
+    }
+}
+```
+
+运行结果：
+
+![image-20220903204628068](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220903204628068.png)
