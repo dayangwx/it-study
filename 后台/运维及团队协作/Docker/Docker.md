@@ -229,7 +229,19 @@ yum-config-manager \
 
 ```shell
 docker-ce ce:社区版  ee:企业版
+最新版本：
 $ sudo yum install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+指定版本：
+列车所有版本：
+$ sudo yum list docker-ce --showduplicates | sort -r
+docker-ce.x86_64            17.03.3.ce-1.el7                   docker-ce-stable 
+docker-ce.x86_64            17.03.2.ce-1.el7.centos            docker-ce-stable 
+docker-ce.x86_64            17.03.1.ce-1.el7.centos            docker-ce-stable 
+docker-ce.x86_64            17.03.0.ce-1.el7.centos            docker-ce-stable 
+安装指定版本：
+$ sudo yum install docker-ce-<version-string> docker-ce-cli-<version-string> containerd.io docker-compose-plugin
+yum install docker-ce-17.03.2.ce-1.el7.centos.x86_64 docker-ce-cli-17.03.2.ce-1.el7.centos.x86_64 containerd.io docker-compose-plugin
+
 ```
 
 ### 2-4.启动docker
@@ -550,10 +562,27 @@ $ docker restart container_id
 $ docker container exec -it container_id /bin/bash
 ```
 
+#### 5-3-6.创建命令
+
+> 创建新容器，但不启动。需要使用start命令去启动。
+
+```shell
+$ docker create [OPTIONS] IMAGE [COMMAND] [ARG...]
+$ docker create -p 6379:6379 redis:latest
+报：WARNING: IPv4 forwarding is disabled. Networking will not work.
+解决：
+	vi /etc/sysctl.conf
+	添加：net.ipv4.ip_forward=1
+	systemctl restart network
+	sysctl net.ipv4.ip_forward返回1表示正常，重启redis即可。
+```
+
+
+
 ### 5-4.其他常用命令
 
-> # 查看资源占用情况
->
+查看资源占用情况
+
 > docker stats
 
 #### 5-4-1.后台启动容器
@@ -609,21 +638,28 @@ $ docker inspect container_id
 
 ##### 5-4-5-1.exec
 
-> 进入容器后开启一个新的终端
+> 进入容器后开启一个新的终端，退出exec并不会停止容器。因为它开的是一个新的终端。
 
 ```shell
 $ docker exec -it container_id /bin/bash
+$ docker exec -it -u 0:0 --privileged container_id /bin/bash: 0:0用户一般指root用户。
 ```
 
 ##### 5-4-5-2.attach
 
-> 进入一个正在运行的容器
+> 进入一个正在运行的容器，进入的是控制台，当你退出attach的时候，容器也会结束，当然这个容器不是后台启动的。不推荐使用这种方式。
+>
+> 推荐使用：exec
 
 ```shell
 $ docker attach container_id
 ```
 
-#### 5-4-6.从容器内拷贝文件到主机
+#### 5-4-6.从容器内拷贝文件到主机或从主机拷贝文件到容器
+
+> docker cp [OPTIONS] CONTAINER:SRC_PATH DEST_PATH|-: 把容器内部文件拷贝到主机
+>
+> docker cp [OPTIONS] SRC_PATH|- CONTAINER:DEST_PATH: 把主机文件拷贝到容器内部
 
 > 把容器内部的文件拷贝出来到主机上。
 >
@@ -642,15 +678,55 @@ $ exit
 $ docker cp container_id:/home/test.java /home
 ```
 
+```shell
+$ docker cp index.html mynginx:/usr/share/nginx/html
+```
+
+
+
 **拷贝是个手动的过程，后续采用卷的技术将自动完成文件的拷贝。**
+
+#### 5-4-7.export
+
+> 将container导出成一个tar包。
+
+```shell
+$ docker export -o mynginx.tar container_id
+```
+
+#### 5-4-8.import
+
+> 将tar包转换成一个镜像。
+>
+> 但是import后的镜像不能直接启动，有兴趣可以自行Google。
+
+```shell
+$ docker import mynginx.tar mynginx:v4
+```
+
+#### 5-4-9.save
+
+> save是把一个或多个镜像打包成tar
+
+```shell
+$ docker save -o nginx.tar nginx
+```
+
+#### 5-4-10.load
+
+> 把save出来的tar加载成一个镜像
+
+```shell
+$ docker load -i nginx.tar
+```
+
+
 
 ### 5-5.小结
 
 <img src="C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20220628221456312.png" alt="image-20220628221456312" style="zoom:67%;" />
 
-```bash
-常用命令合集
-```
+
 
 ## 6、牛刀小试
 
@@ -713,7 +789,11 @@ $ cp -r webapps.dist/* webapps
 
 ​	
 
-### 6-3.Docker部署ES
+### 6-3.Docker部署Redis
+
+> 参考：
+>
+> ​	https://cloud.tencent.com/developer/article/1670205
 
 ## 7、Docker界面可视化工具
 
@@ -1341,6 +1421,7 @@ $ docker login -u dayangwx
 $ docker images 
 
 # 2-1.如果想给镜像加tag请执行(通常情况下发布到dockerhub的镜像都会加tag)
+# 多说两句：tag也可以用于改名，改成后面的名字。并且要推dockerhub必须让本地的镜像名字前面(dayangwx)与dockerhub里你的名字一致(dockerhub的名字是dayangwx)
 $ docker tag dayangwx/tomcat-diy-by-leo dayangwx/tomcat-diy-by-leo:1.0.0
 
 # 3.发布
