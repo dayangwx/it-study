@@ -87,6 +87,12 @@
 | 资源占用 | 多(即使不用也会占用分配的资源) | 少(共享资源)           |
 | 体积大小 | 大(需要打包整个系统)           | 小(只打包用到的组件)   |
 
+> docker安装与宿主机安装的优缺点
+>
+> 优点：docker安装的移植性与便捷性更好，并且进程隔离，方便控制资源
+>
+> 缺点：docker是虚拟化技术，会损失大约10%的性能
+
 ### 1-3.Docker是什么
 
 > **Docker 属于 Linux 容器的一种封装，提供简单易用的容器使用接口。**它是目前最流行的 Linux 容器解决方案。
@@ -303,6 +309,19 @@ $ sudo rm -rf /var/lib/containerd
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220619210939264.png" alt="image-20220619210939264" style="zoom:50%;" />
 
+### 4-1.Docker长久运行之道
+
+> 就是让docker有活干。
+
+```bash
+让busybox启动后一直ping baidu
+$ docker run -d busybox ping baidu.com
+
+$ docker log -f image_id
+```
+
+
+
 ## 5、Docker常用命令
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717180235806.png" alt="image-20220717180235806" style="zoom:67%;" />
@@ -467,7 +486,7 @@ $ docker run [可选参数] image
 $ docker pull centos
 2:启动docker 
 $ docker run -it centos /bin/bash
--it参数   ：容器的 Shell 映射到当前的 Shell，然后你在本机窗口输入的命令，就会传入容器。
+-it参数   ：容器的 Shell 映射到当前的 Shell，然后你在本机窗口输入的命令，就会传入容器。就是交互模式
 /bin/bash：容器启动以后，内部第一个执行的命令。这里是启动 Bash，保证用户可以使用 Shell。
 
 #eg：
@@ -714,7 +733,9 @@ $ docker save -o nginx.tar nginx
 
 #### 5-4-10.load
 
-> 把save出来的tar加载成一个镜像
+> 把save出来的tar加载成一个镜像。
+>
+> 这个镜像可以直接运行。
 
 ```shell
 $ docker load -i nginx.tar
@@ -829,7 +850,28 @@ $ docker run -d -p 8088:9000 --restart=always -v /var/run/docker.sock:/var/run/d
 
 ### 8-2.Docker镜像加载原理
 
-
+> storage driver
+>
+> 1. overlay
+> 2. AUF (联合文件系统)
+> 3. 。。。
+>
+> 
+>
+> 使用overlay的方式加载，会有三个目录。
+>
+> 1. merged path : 合并后的目录，是个虚拟的目录，最全。
+>
+> 2. upper path : 所有手动更改的，使用cow(copy on write[写时复制])原则，就是默认用lower path里的内容，如果有更改比如和说更改了nginx.conf文件，那么这个文件会被保存到upper path下，并且在启动容器的时候使用这个最新的nginx.conf。
+>
+>    挂载就是挂载的uppper path
+>
+> 3. lower path : 最底层的，最基本，包含了最小Linux系统和一些必要的东西，并且多个image会公用这里公共的东西，同时这里的东西永远不会改变。
+>
+> ```bash
+> 查看上述三个目录: 
+> $ docker inspect container_id
+> ```
 
 ### 8-3.分层理解
 
@@ -875,6 +917,12 @@ tomcat-leo01          1.0       71dd8e339d09   6 seconds ago   487MB
 > **而宿主机目录发生变化同样可以同步到容器内目录下，即使容器时停止的，只要它没有删除就可以。**
 >
 > 可以简单把这两个目录理解为**双向绑定**
+
+> 挂载的方式：
+>
+> 1. docker在外部自动创建文件夹并且挂载容器内部指定的文件内容。[使用Dockerfile VOLUME指令]
+> 2. 自己在外部创建文件夹，手动挂载
+> 3. 直接挂载到内存中。
 
 ```shell
 $ docker run -v /home/testcentos:/home ...
@@ -1009,8 +1057,7 @@ $ docker volume inspect juming-ng
         "CreatedAt": "2022-07-12T20:31:32+08:00",
         "Driver": "local",
         "Labels": null,
-        -- 挂载路径，就是宿主机的路径
-        "Mountpoint": "/var/lib/docker/volumes/juming-ng/_data",
+        "Mountpoint": "/var/lib/docker/volumes/juming-ng/_data", -- 挂载路径，就是宿主机的路径。就是把容器内/etc/nginx里的文件拷贝到这个目录下。
         "Name": "juming-ng",
         "Options": null,
         "Scope": "local"
@@ -1027,10 +1074,72 @@ $ docker volume inspect juming-ng
 > ​	... -v 宿主机路径:容器内路径
 
 ```shell
-$ docker run -d -P --name nginxleo05 -v /home/testnginx:/etc/nginx nginx这个为什么是错误的？
+$ docker run -d -P --name nginxleo05 nginx 
+$ docker run -d -P --name=nginxleo07 -v /root/html:/usr/share/nginx/html nginx
 
-https://blog.csdn.net/xyajia/article/details/107161167
+第一个可以正常访问；
+第二个403 Forbidden；
+请问是为什么？
+
+因为第二个挂载了宿主机里的/root/html，启动的容器里没有index.html,并且映射的/root/html/index.html也不存在，所以就会报错。
+解决方案也很简单，给/root/html下加上首页即可。
+$ cd /root/html
+$ echo "<h1>hello leo, welcome nginx</h1>" > index.html
+refresh page，发现有首页了！
+同时查看容器内部的/usr/share/nginx/html目录，发现index.html页面也出现了，说明从宿主机上映射过来了。
+$ docker exec -it container_id /bin/bash
+$ cd /usr/share/nginx/html
+$ root@aa0ffed10048:/usr/share/nginx/html# ls
+index.html
+
+所以一定要小心空映射问题。
 ```
+
+```bash
+$ docker run -d -P -v html:/usr/share/nginx/html nginx
+为什么这种方式也可以正常访问nginx的默认首页？
+难道是因为html不是目录？
+```
+
+
+
+```bash
+# 一行命令启动nginx并且配置文件和html页面都挂载。不过需要知道卷的位置才能改
+$ docker run -d -P -v nginxconf:/etc/nginx/ -v nginxpage:/usr/share/nginx/html --name=nginx000 ngix
+# 上面的命令中，/etc/nginx是配置文件卷的位置 /usr/share/nginx/html是页面卷的位置
+"Mounts": [
+            {
+                "Type": "volume",
+                "Name": "nginxconf",
+                "Source": "/var/lib/docker/volumes/nginxconf/_data", -- 宿主机的这个目录下有配置文件，通过改这里从而改nginx配置
+                "Destination": "/etc/nginx",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            },
+            {
+                "Type": "volume",
+                "Name": "nginxpage",
+                "Source": "/var/lib/docker/volumes/nginxpage/_data",-- 宿主机这个目录下有页面，通过改这里从而改nginx页面
+                "Destination": "/usr/share/nginx/html",
+                "Driver": "local",
+                "Mode": "z",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+```
+
+```bash
+# 想要实现具名挂载并且避免空挂载。
+$ docker run -d -P -v /root/nginxconf:/etc/nginx/ -v /root/nginxhtml:/usr/share/nginx/html --name=nginx111 nginx
+-- 1: 提前准备好东西放到/root/nginxconf以及/root/nginxhtml目录下
+-- 2: docker cp nginxdemo:/etc/nginx /root/nginxconf --就是把nginxdemo这个容器/etc/nginx目录下的内容复制到宿主机/root/nginxconf下。
+      docker cp nginxdemo:/usr/share/nginx/html /root/nginxhtml -- 与上面同理
+```
+
+
 
 #### 9-4-4.拓展
 
@@ -1042,7 +1151,7 @@ https://blog.csdn.net/xyajia/article/details/107161167
 $ docker run -d -P --name juming-nginx001  -v juming-ng:/etc/nginx:ro nginx
 $ docker run -d -P --name juming-nginx001  -v juming-ng:/etc/nginx:rw nginx
 ro: read only    只读
-rw: read write   可读可写
+rw: read write   可读可写，默认值
 
 只要看到ro就说明挂载的路径只能通过宿主机来修改，容器内是操作不了挂载的路径的！
 
