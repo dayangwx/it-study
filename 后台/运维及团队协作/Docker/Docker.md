@@ -320,6 +320,14 @@ $ docker run -d busybox ping baidu.com
 $ docker log -f image_id
 ```
 
+### 4-2.如何开机自启
+
+> 当docker重启或者服务重启的时候，如何让容器也跟着启动呢？
+
+```bash
+$ docker run -d -P --restart=always --name=nginx01 nginx --就是容器挂了就会自动重启。	
+```
+
 
 
 ## 5、Docker常用命令
@@ -741,6 +749,18 @@ $ docker save -o nginx.tar nginx
 $ docker load -i nginx.tar
 ```
 
+#### 5-5-11.常用命令
+
+> 常用的、特殊的命令
+
+```bash
+1: 净化docker系统。删除所有stoped容器、所有不用的网络、游离的镜像、构建缓存
+$ docker system prune
+
+2: 删除所有容器
+$ docker rm -f $(docker ps -aq)
+```
+
 
 
 ### 5-5.小结
@@ -916,7 +936,13 @@ tomcat-leo01          1.0       71dd8e339d09   6 seconds ago   487MB
 >
 > **而宿主机目录发生变化同样可以同步到容器内目录下，即使容器时停止的，只要它没有删除就可以。**
 >
-> 可以简单把这两个目录理解为**双向绑定**
+> 可以简单把这两个目录理解为**双向绑定**，
+>
+> **你操作容器内，宿主机会一起发生变化；**
+>
+> **你操作宿主机，容器内也会一起发生变化。**
+>
+> 当然挂载的目的就是为了外边修改里面变。
 
 > 挂载的方式：
 >
@@ -1037,6 +1063,8 @@ $ docker volume inspect 83111f5469b8615b829ebd06819df82ffb14a21b74ab82c54673aa34
 
 > 就是有名字的挂载。
 >
+> 特点：容器长啥样，宿主机长啥样
+>
 > 格式：
 > 	... -v 名字:容器内路径
 
@@ -1068,6 +1096,8 @@ $ docker volume inspect juming-ng
 #### 9-4-3.指定路径挂载
 
 > 就是指定宿主机路径的挂载。
+>
+> 特点：宿主机长啥样，容器长啥样
 >
 > 格式：
 >
@@ -1155,6 +1185,14 @@ rw: read write   可读可写，默认值
 
 只要看到ro就说明挂载的路径只能通过宿主机来修改，容器内是操作不了挂载的路径的！
 
+```
+
+> 删除所有不用的卷
+
+```bash
+$ docker volume prune  -- 删除游离的卷，当一个容器被删除后，它的卷就成了游离状态。
+
+$ docker volume ls -- 列出所有的卷
 ```
 
 
@@ -1288,7 +1326,7 @@ $ docker run -d -p 3310:3306 --volumes-from mysql-leo  -e MYSQL_ROOT_PASSWORD=12
 
 ```shell
 FROM			#基础镜像，一切从这里开始
-MAINTAINER		#镜像是谁写的，姓名+邮箱
+MAINTAINER(LABEL)#镜像是谁写的，姓名+邮箱，现在建议使用LABEL
 RUN				#镜像构建的时候需要运行的命令
 ADD				#步骤：加tomcat镜像，就添加tomcat的压缩包
 WORKDIR			#镜像的工作目录
@@ -1304,6 +1342,379 @@ ENV				#构建的时候设置环境变量
 
 
 <img src="https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220713204610577.png" alt="image-20220713204610577" style="zoom:47%;" />
+
+#### 10-3-1.ARG
+
+> arg即argument。参数。
+>
+> 只能在构建期生效。构建期就是RUN
+
+```dockerfile
+定义参数version
+ARG version
+$version=1.0
+
+定义参数并给定默认值
+ARG version=1.0
+
+RUN echo $version
+
+$ docker build --no-cache -t demo:test -f Dockerfile .
+
+Dockerfile文件定义了version，通过--build-arg可以修改值。
+$ docker build --no-cache --build-arg version=3.13 -t demo:test -f Dockerfile .
+```
+
+#### 10-3-2.ENV
+
+> 也是定义参数。
+>
+> 在构建期(RUN)和运行期(CMD)都可以生效
+
+```dockerfile
+ARG version=3.13.4
+
+FROM alpine:$version
+
+LABEL maintainer="leo liu"
+
+# ENV定义的参数在构建期和运行期都可以生效
+# 怎么修改它的值？
+ENV app=manulife
+
+RUN echo $app
+
+ARG msg="hello docker"
+
+RUN echo $msg
+
+CMD ["bin/sh","-c","echo ----;echo $msg; echo app_$app"]
+```
+
+```bash
+$ docker run -it demo:test
+----
+
+app_manulife
+
+如何修改ENV的值？
+1：构建期：不可更改
+2：运行期
+	$ docker run -it --env app=manulife.com demo:test
+```
+
+> env持久化问题：
+>
+>  env在构建期会把值持久化到配置里(docker image inspect image_id的config里可以查看)，所以在容器阶段是只能改env本身的值，而不可以改引用env值的其他env。
+>
+> 
+>
+> 下例中：
+>
+>   不可以通过 docker run -it --env msg1=666 demo:test 的方式更改msg2的值，你只能更改到msg1的值。
+
+```dockerfile
+FROM alpine
+
+ENV msg1=hello
+ENV msg2=${msg1}
+
+RUN $msg1
+RUN $msg2
+
+CMD ["bin/sh","-c",echo $msg1; echo $msg2"]
+```
+
+#### 10-3-3.ADD
+
+> ADD会把上下文Context指定的内容添加到镜像中。
+>
+> 如果是压缩包，会自动解压；
+>
+> 如果是远程文件，会自动下载。
+>
+> 但是如果是一个远程压缩包，下载后是不会自动解压的。
+>
+> 是从宿主机copy到容器内。
+>
+> $ docker build --no-cache -t demo:test -f Dockerfile2 .
+>
+> // 上面命令中的.代表上下文路径，就是docker构建在哪个路径下找东西，上例中.就指的是Dockerfile2文件所在路径。
+> // 比如说dockerfile文件里有ADD *.tar.gz /app/，就是说从Dockerfile文件所在路径下找到所有的tar.gz文件然后复制到/app目录下。
+>
+> // 所以说最后面不一定是.，如果你的文件在/root/dockerfiles目录下，
+> // 那么命令就该这么写：
+>
+> // docker build --no-cache -t demo:test -f Dockerfile2 /root/dockerfiles
+
+```docker
+FROM alpine
+
+#把远程redis文件下载后放到小型Linux系统里的dest/目录下
+ADD https://github.com/redis/redis/archive/7.0.8.tar.gz /dest/
+RUN ls -l
+
+RUN cd /dest
+
+# 这个ls还是/dest目录的
+RUN ls -l
+
+# 只有把两个命令写到一个RUN下，才会ls dest目录下的内容
+RUN cd /dest && ls -l
+```
+
+#### 10-3-4.COPY
+
+> COPY和ADD的作用一模一样，就是复制东西用的。
+>
+> 是从宿主机copy到容器内。
+>
+> 但是它不可以自动解压，也不可以自动下载。
+
+```dockerfile
+FROM alpine
+
+#把远程redis文件下载后放到小型Linux系统里的dest/目录下
+COPY https://github.com/redis/redis/archive/7.0.8.tar.gz /dest/
+RUN ls -l
+
+RUN cd /dest
+
+# 这个ls还是/dest目录的
+RUN ls -l
+
+# 只有把两个命令写到一个RUN下，才会ls dest目录下的内容
+RUN cd /dest && ls -l
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile3 .
+COPY failed: source can't be a URL for COPY
+```
+
+#### 10-3-5.WORKDIR
+
+> 为后面的命令指定路径。
+
+```dockerfile
+FROM alpine 
+
+RUN pwd && ls
+
+WORKDIR /app
+
+COPY *.txt ./
+
+RUN pwd && ls
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile4 .
+会发现COPY命令和RUN命令都是在/app下进行的。
+所以WORKDIR为后面的命令指定了目录。
+```
+
+> 它可以嵌套目录
+>
+> 如：
+>
+> WORKDIR /app
+> WORKDIR abc
+>
+> 那指定的就是：/app/abc目录了。
+>
+> 并且当我们使用docker exec -it mytest /bin/bash的方式进入到容器后，他的默认路径就是/app/abc
+
+#### 10-3-6.USER
+
+> 指定下面命令使用的用户。
+
+```dockerfile
+FROM alpine
+
+# 下面的命令都使用这个用户
+USER 1000:1000
+
+COPY *.txt ./a.txt
+
+RUN ls -l /
+
+RUN echo 2222 > a.txt
+```
+
+> 这种情况会报：/bin/sh: can't create a.txt: Permission denied
+>
+> 因为a.txt是root用户的，而1000用户没有权限去操作。
+>
+> 如何改呢？
+>
+> 在copy的时候指定用户，复制后a.txt就是1000用户的了。
+
+```dockerfile
+FROM alpine 
+
+USER 1000:1000
+
+COPY --chown=1000:1000 *.txt ./a.txt
+
+RUN ls -l /
+
+RUN echo 2222 > a.txt
+
+RUN cat a.txt
+```
+
+#### 10-3-7.Volume
+
+> 挂载。
+>
+> 把容器内的路径挂载到宿主机上。
+
+```dockerfile
+FROM alpine
+
+RUN mkdir /hello && mkdir /app
+RUN echo 111 > /hello/a.txt
+RUN echo 222 > /app/b.txt
+
+# 挂载容器的指定文件夹，如果不存在这个文件夹就会自动创建
+# 指定了volume，即使启动容器没有指定-v参数，也会自动进行匿名挂载
+# 容器内的/hello和/app文件夹，在启动容器的时候会自动宿主机挂载。注意是在启动的时候，构建完成后并不会挂载到宿主机上噢。
+VOLUME ["/hello","/app"]
+
+CMD ping baidu.com
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile7 .
+
+$ docker inspect demo:test 在这里还没有挂载到宿主机上
+
+$ docker run -d demo:test
+
+$ docker insepect container_id 这里就可以看到已经挂载到宿主机上了。Mounts。并且可以打开目录查看文件。
+```
+
+> docker commit提交镜像的时候不会提交挂载出去的东西
+>
+> 所以我们的java应用经常会挂载log：
+>
+> VOLUME ["log"]
+>
+> 当镜像提交的时候，不会把log日志也提交上去。
+
+#### 10-3-8.EXPOSE
+
+> 暴露端口，其实只是一个声明。
+>
+> 不是说启动一定会使用。
+>
+> 当我们使用-P启动的时候，会检查里面的EXPOSE配置，从而暴露端口。
+
+```dockerfile
+EXPOSE 8080
+EXPOSE 8082
+```
+
+#### 10-3-9.ENTRYPOINT && CMD
+
+> ENTRYPOINT和CMD都是指定容器启动时候要运行的命令。
+>
+> 但是CMD是可以更改命令的，而ENTRYPOINT不可以更改命令的。
+>
+> 所以说ENTRYPOINT是真正的入口，比如说一个容器的启动命令，就该使用ENTRYPOINT.
+>
+> 不过通常情况下，会使用ENTRYPOINT + CMD的方式做容器的启动命令。
+
+测试一：
+
+```dockerfile
+FROM alpine
+
+CMD ping baidu.com
+```
+
+```shell
+$ docker run -it --rm demo:test
+
+$ docker run -it --rm demo:test ping google.com -- 会ping Google，也就是说CMD可以被改变
+```
+
+测试二：
+
+```
+FROM alpine
+
+ENTRYPOINT ping baidu.com
+```
+
+```shell
+$ docker run -it --rm demo:test
+
+$ docker run -it --rm demo:test pping google.com --还是会ping baidu，说明ENTRYPOINT不可以被更改
+```
+
+测试三
+
+```
+FROM alpine
+
+CMD ping baidu.com
+CMD ping google.com
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile9 .
+
+$ docker run -it --rm demo:test --发现会ping google，也就是说只有最后一个会生效。
+```
+
+测试四
+
+```
+FROM alpine
+
+ENTRYPOINT ping baidu.com
+ENTRYPOINT ping google.com
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile10 .
+
+$ docker run -it --rm demo:test -- 会发现ping Google，也就是说只有最后一个会生效。
+```
+
+组合写法：
+
+```dockerfile
+FROM alpine
+
+# CMD加ENTRYPOINT成为一个完整的命令。ping baidu.com
+CMD ["baidu.com"] # 给ENTRYPOINT提供参数。
+ENTRYPOINT ["ping"] # 真正的启动该容器的入口。
+```
+
+```shell
+$ docker build --no-cache -t demo:test -f Dockerfile11 .
+
+$ docker run -it --rm demo:test --在ping 百度
+
+$ docker run -it --rm demo:test google.com --在ping谷歌，说明CMD的命令被改了。
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+​	
 
 ### 10-4.牛刀小试
 
@@ -1353,6 +1764,38 @@ $ docker run -it centos-plus-leo
 
 启动之后，查看vim命令与ifconfig命令是否可以执行。
 ```
+
+```dockerfile
+# 这是我的Dockerfile
+FROM alpine
+
+# 给镜像加个标签
+LABEL maintainer="Leo Liu"
+
+# 运行的指令，安装了软件，修改了文件。默认是用id=0，就是这个基础系统的root用户。
+# 代表镜像构建过程中运行的命令
+RUN echo 11111
+
+# 镜像启动如果要运行很长命令才行
+## 1：准备一个sh问及那，让镜像启动运行sh文件（大多镜像使用这种方式）
+## 2：直接在CMD位置写
+CMD sleep 10;echo success
+```
+
+```bash
+构建镜像
+$ docker build -t myalpine:v1.0 -f Dockerfile .
+构建成功后：
+$ docker images 
+运行镜像：
+$ docker run -it --name=hello111 myalpine:v1.0
+打印了success后容器就停止了，查看它来过：
+$ docker ps -a
+查看日志：
+$ docker logs container_id
+```
+
+
 
 #### 10-4-2.CMD与ENTRYPOINT的区别
 
@@ -1539,11 +1982,112 @@ $ docker push dayangwx/tomcat-diy-by-leo:1.0.0
 
 ![image-20220717182704336](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20220717182704336.png)
 
+### 10-6.多阶段构建
+
+> multi-stage builds
+>
+> 作用：给镜像瘦身。
+>
+> 怎么瘦身呢？
+> 把事情分成多个阶段，
+>
+> 最后只要最后一个阶段的东西，其他阶段的东西不会打到镜像里。
+>
+> 比如说：
+>
+> step1：使用maven打包生成jar包
+>
+> step2：使用jre运行第一步做好的jar包
+>
+> 那么step1就可以被省略，这样就瘦身了。
+
+```
+#以下所有前提 保证Dockerfile和项目在同一个文件夹
+# 第一阶段：环境构建; 用这个也可以
+FROM maven:3.5.0-jdk-8-alpine AS builder
+WORKDIR /app
+ADD ./ /app
+RUN mvn clean package -Dmaven.test.skip=true
+
+# 第二阶段，最小运行时环境，只需要jre；第二阶段并不会有第一阶段哪些没用的层
+#基础镜像没有 jmap； jdk springboot-actutor（jdk）
+FROM openjdk:8-jre-alpine
+LABEL maintainer="534096094@qq.com"
+# 从上一个阶段复制内容
+COPY --from=builder /app/target/*.jar /app.jar
+# 修改时区
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo
+'Asia/Shanghai' >/etc/timezone && touch /app.jar
+ENV JAVA_OPTS=""
+ENV PARAMS=""
+# 运行jar包
+ENTRYPOINT [ "sh", "-c", "java -Djava.security.egd=file:/dev/./urandom
+$JAVA_OPTS -jar /app.jar $PARAMS" ]
+```
+
+### 10-7.Images瘦身实践
+
+> 如何让镜像足够的小。
+
+- 选择最小的基础镜像 
+- 合并RUN环节的所有指令，少生成一些层 
+- RUN期间可能安装其他程序会生成临时缓存，要自行删除。如：
+
+```shell
+# 开发期间，逐层验证正确的
+RUN xxx
+RUN xxx
+RUN aaa \
+aaa \
+vvv \
+#生产环境
+RUN apt-get update && apt-get install -y \
+bzr \
+cvs \
+git \
+mercurial \
+subversion \
+&& rm -rf /var/lib/apt/lists/*
+
+```
+
+- 使用 .dockerignore 文件，排除上下文中无需参与构建的资源 
+- 使用多阶段构建 
+- 合理使用构建缓存加速构建。[--no-cache]
+
+### 10-8.springboot java 最终写法
+
+```dockerfile
+FROM openjdk:8-jre-alpine
+
+LABEL maintainer="534096094@qq.com"
+
+COPY target/*.jar /app.jar
+
+# 其中touch /app.jar的作用就是更新下时间。
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo
+'Asia/Shanghai' >/etc/timezone && touch /app.jar
+
+ENV JAVA_OPTS=""
+ENV PARAMS=""
+
+ENTRYPOINT [ "sh", "-c", "java -Djava.security.egd=file:/dev/./urandom
+$JAVA_OPTS -jar /app.jar $PARAMS" ]
+# 运行命令 docker run -e JAVA_OPTS="-Xmx512m -Xms33 -" -e PARAMS="--
+spring.profiles=dev --server.port=8080" -jar /app/app.jar
+```
+
+
+
+
+
 ## 11、Docker网络
 
 ### 11-0.docker0
 
 > 如果启动了两个tomcat，那么这两个tomcat如何互相访问？
+
+![image-20230312143955765](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20230312143955765.png)
 
 ```bash
 # 1.启动一个tomcat
@@ -1718,13 +2262,15 @@ PING tomcat02 (172.17.0.3) 56(84) bytes of data.
 
 ### 11-2.自定义网络
 
-> 为了解决容器直接不能直接通过name ping通的问题，我们可以使用自动网络。
+> 为了解决容器直接不能直接通过name ping通的问题，我们可以使用自定义网络。
 >
 > 过程：
 >
-> ​	1：创建自定网络
+> ​	1：创建自定义网络
 >
-> ​	2：容器启动时使用自定的网络
+> ​	2：容器启动时使用自定义的网络
+>
+> 其实说直白的点就是：我创建了一个网络，容器(如：tomcat,redis等)启动的时候都使用这个网络，那么他们直接就可以直接互相ping通了。
 
 认识docker网络：
 
@@ -1765,6 +2311,8 @@ $ docker network inspect network_id
 ```
 
 启动tomcat
+
+> 启动tomcat的时候指定刚才创建好的自定义网络。
 
 ```bash
 $ docker run -d -P --name tomcat01 --network mynet tomcat
