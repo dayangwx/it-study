@@ -2418,3 +2418,182 @@ $ curl http://localhost:8080/hello
 hello docker! I'm springboot project
 ```
 
+## 13、Docker Compose
+
+> 有这样一个场景：你的项目是前后端分离的，
+>
+> 前端+nginx+后端service1+后端service2+mysql+redis
+>
+> 如果使用docker启动，那么你就需要把这些服务一个一个启动，并且要保证网络互通，还需要挂载等。
+>
+> 那么这就很繁琐，
+>
+> 使用Docker Compose，就可以一站式解决上述问题，让你的部署不再繁琐。
+>
+> 这就是容器编排。
+
+### 13-1.安装docker compose
+
+> docker compose安装：
+>
+> [Install the Compose plugin (docker.com)](https://docs.docker.com/compose/install/linux/#install-the-plugin-manually)
+
+```shell
+1:To download and install the Compose CLI plugin, run:
+$ DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+$ mkdir -p $DOCKER_CONFIG/cli-plugins
+$ curl -SL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+
+2:Apply executable permissions to the binary:
+$ chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+给所有用户安装：
+$ sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+3:Test the installation.
+$ docker compose version
+```
+
+### 13-2.卸载docker compose
+
+> 有安装有卸载，就是这么贴心。
+
+```shell
+$ rm $DOCKER_CONFIG/cli-plugins/docker-compose
+
+Or, if you have installed Compose for all users, run:
+$ rm /usr/local/lib/docker/cli-plugins/docker-compose
+
+To check where Compose is installed, use:
+docker info --format '{{range .ClientInfo.Plugins}}{{if eq .Name "compose"}}{{.Path}}{{end}}{{end}}'
+```
+
+### 13-3.牛刀小试
+
+> 使用python和redis简单做一个容器编排的小例子：
+>
+> 你访问了我多少次。
+>
+> You don’t need to install Python or Redis, as both are provided by Docker images.
+
+#### 13-3-1.Define the application dependencies
+
+- Create a directory for the project:
+
+  ```shell
+  $ mkdir composetest
+  $ cd composetest
+  ```
+
+- Create a file called `app.py` in your project directory and paste the following code in:
+
+  ```python
+  import time
+  
+  import redis
+  from flask import Flask
+  
+  app = Flask(__name__)
+  cache = redis.Redis(host='redis', port=6379)
+  
+  def get_hit_count():
+      retries = 5
+      while True:
+          try:
+              return cache.incr('hits')
+          except redis.exceptions.ConnectionError as exc:
+              if retries == 0:
+                  raise exc
+              retries -= 1
+              time.sleep(0.5)
+  
+  @app.route('/')
+  def hello():
+      count = get_hit_count()
+      return 'Hello World! I have been seen {} times.\n'.format(count)
+  ```
+
+  In this example, `redis` is the hostname of the redis container on the application’s network. We use the default port for Redis, `6379`.
+
+- Create another file called `requirements.txt` in your project directory and paste the following code in:
+
+  ```dockerfile
+  flask
+  redis
+  ```
+
+#### 13-3-2.Create a Dockerfile
+
+> The Dockerfile is used to build a Docker image. The image contains all the dependencies the Python application requires, including Python itself.
+
+In your project directory, create a file named `Dockerfile` and paste the following code in:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM python:3.7-alpine
+WORKDIR /code
+ENV FLASK_APP=app.py
+ENV FLASK_RUN_HOST=0.0.0.0
+RUN apk add --no-cache gcc musl-dev linux-headers
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+EXPOSE 5000
+COPY . .
+CMD ["flask", "run"]
+```
+
+This tells Docker to:
+
+- Build an image starting with the Python 3.7 image.
+- Set the working directory to `/code`.
+- Set environment variables used by the `flask` command.
+- Install gcc and other dependencies
+- Copy `requirements.txt` and install the Python dependencies.
+- Add metadata to the image to describe that the container is listening on port 5000
+- Copy the current directory `.` in the project to the workdir `.` in the image.
+- Set the default command for the container to `flask run`.
+
+#### 13-3-3.Define services in a Compose fil
+
+> 创建docker compose编排文件，
+>
+> 是yaml格式的，对我们来说很亲切。
+>
+> docker-compose.yml
+
+```yaml
+version: "3.9" #指定版本号;查看文档https://docs.docker.com/compose/compose-file/
+services: #所有需要启动的服务
+  web: #第一个服务的名字
+    build: #docker build -t xxx -f Dockerfile .
+      dockerfile: Dockerfile
+      context: .
+    image: 'hello:py'
+    ports: #指定启动容器暴露的端口
+      - "5000:5000"
+  redis: #第二个服务的名字
+    image: "redis:alpine"
+```
+
+#### 13-3-4.Build and run your app with Compose
+
+> 构建并运行你的app。
+>
+> 很简单，就一条命令。
+
+```shell
+$ docker compose up
+```
+
+```shell
+$ docker compose down
+```
+
+![image-20230316215647264](https://raw.githubusercontent.com/dayangwx/cloudimg/master/img/image-20230316215647264.png)
+
+## 14、Docker Swarm
+
+> 容器编排与管理。
+>
+> 搞集群的
+
+![image-20230316215704589](C:\Users\97146\AppData\Roaming\Typora\typora-user-images\image-20230316215704589.png)
